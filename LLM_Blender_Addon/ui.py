@@ -89,7 +89,7 @@ class LLMPropertyGroup(PropertyGroup):
     system_prompt: StringProperty(
         name="System Prompt",
         description="System instructions for the LLM",
-        default="Generate only Python code using bpy (Blender API). No explanations. Use ```python code blocks."
+        default="Generate Python code using bpy.ops ONLY. No collection.objects.link(). No lights. No active_layer_collection. Use ```python blocks."
     )
     
     # User prompt

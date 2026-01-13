@@ -13,6 +13,76 @@ class SceneGenerator:
     """Handles 3D scene generation from LLM responses"""
     
     @staticmethod
+    def sanitize_code(code: str) -> str:
+        """
+        Sanitize and fix common Blender API mistakes in generated code
+        
+        Args:
+            code: Raw Python code from LLM
+            
+        Returns:
+            Sanitized code with common errors fixed
+        """
+        print("[DEBUG] Sanitizing code...")
+        
+        # Remove problematic lines that cause common errors
+        lines_to_remove = [
+            'active_layer_collection',
+            'view_layer.active_layer_collection',
+            'bpy.context.view_layer.active_layer_collection',
+            '.link(light)',
+            '.link(camera)',
+            '.link(lamp)',
+            'collection.objects.link(light',
+            'collection.objects.link(lamp',
+            'scene.collection.objects.link(light',
+            'scene.collection.objects.link(lamp',
+        ]
+        
+        sanitized_lines = []
+        for line in code.split('\n'):
+            skip_line = False
+            for problematic in lines_to_remove:
+                if problematic in line:
+                    print(f"[DEBUG] Removing problematic line: {line.strip()}")
+                    skip_line = True
+                    break
+            if not skip_line:
+                sanitized_lines.append(line)
+        
+        code = '\n'.join(sanitized_lines)
+        
+        # Replace common incorrect patterns
+        replacements = [
+            # Fix active_object assignment issues
+            ('bpy.context.active_object = ', '# '),
+            ('context.active_object = ', '# '),
+            
+            # Fix collection linking for lights - use bpy.ops instead
+            ('bpy.data.lights.new(', '# Light creation simplified - '),
+            ('bpy.data.objects.new(name=', 'bpy.ops.object.light_add(type="POINT", location=(0,0,3)) # '),
+            
+            # Fix scene.objects.link (deprecated)
+            ('bpy.context.scene.objects.link(', '# Deprecated: '),
+            ('scene.objects.link(', '# Deprecated: '),
+            
+            # Fix incorrect collection access
+            ('bpy.context.scene.collection.objects.link(bpy.data.objects', '# Fixed: '),
+        ]
+        
+        for old, new in replacements:
+            if old in code:
+                print(f"[DEBUG] Replacing: {old} -> {new}")
+                code = code.replace(old, new)
+        
+        # Ensure import bpy is present
+        if 'import bpy' not in code:
+            code = 'import bpy\n' + code
+        
+        print("[DEBUG] Code sanitization complete")
+        return code
+    
+    @staticmethod
     def extract_python_code(response: str) -> Optional[str]:
         """
         Extract Python code from LLM response
@@ -121,17 +191,25 @@ class SceneGenerator:
             Enhanced prompt
         """
         base_context = (
-            "Generate ONLY Python code for Blender. Use bpy module. "
-            "Wrap in ```python blocks. No explanations.\n\n"
+            "Generate ONLY Python code for Blender using bpy.ops functions. "
+            "Wrap in ```python blocks. No explanations.\n"
+            "RULES: Use ONLY bpy.ops for creating objects. Do NOT use collection.objects.link(). "
+            "Do NOT create lights manually. Do NOT modify active_layer_collection.\n\n"
         )
         
         if with_steps:
             steps = (
-                "EXAMPLE:\n"
+                "EXAMPLE for chair:\n"
                 "```python\n"
                 "import bpy\n"
-                "bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))\n"
-                "bpy.context.object.name = 'MyCube'\n"
+                "# Seat\n"
+                "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))\n"
+                "bpy.context.object.name = 'Seat'\n"
+                "bpy.context.object.scale = (1, 1, 0.1)\n"
+                "# Legs\n"
+                "for x, y in [(-0.4, -0.4), (0.4, -0.4), (-0.4, 0.4), (0.4, 0.4)]:\n"
+                "    bpy.ops.mesh.primitive_cube_add(size=0.1, location=(x, y, 0.25))\n"
+                "    bpy.context.object.scale = (1, 1, 5)\n"
                 "```\n\n"
             )
             base_context += steps
@@ -212,8 +290,14 @@ def process_llm_response(response: str, library_imports: str = "",
         print(f"[DEBUG] ✓ Code extracted successfully ({len(code)} chars)")
         print(f"[DEBUG] Extracted code:\n{code}")
         print("#"*60)
-        success, message = generator.execute_blender_script(code, library_imports)
-        return success, message, code
+        
+        # Sanitize the code to fix common LLM mistakes
+        sanitized_code = generator.sanitize_code(code)
+        print(f"[DEBUG] Sanitized code:\n{sanitized_code}")
+        print("#"*60)
+        
+        success, message = generator.execute_blender_script(sanitized_code, library_imports)
+        return success, message, sanitized_code
     else:
         print("[DEBUG] ✗ No code found in response")
         print(f"[DEBUG] Full response:\n{response}")
