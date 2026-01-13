@@ -103,10 +103,12 @@ class LLM_OT_RunAndExecute(Operator):
         
         wm.progress_update(80)
         
-        # Process and execute response
+        # Process and execute response - pass original prompt for template matching
         exec_success, message, code = scene_generator.process_llm_response(
             response,
-            library_imports=props.library_imports
+            library_imports=props.library_imports,
+            create_fallback=True,
+            original_prompt=props.user_prompt
         )
         
         wm.progress_update(90)
@@ -292,6 +294,43 @@ print('Test cube created successfully!')
             return {'CANCELLED'}
 
 
+class LLM_OT_QuickCreate(Operator):
+    """Quick create objects using pre-built templates (no LLM needed)"""
+    bl_idname = "llm.quick_create"
+    bl_label = "Quick Create (Template)"
+    bl_description = "Create objects instantly using templates - no LLM required"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        props = context.scene.llm_props
+        
+        if not props.user_prompt:
+            self.report({'ERROR'}, "Please enter what to create (e.g., 'chair', 'table')")
+            return {'CANCELLED'}
+        
+        from . import scene_generator
+        
+        # Find matching template
+        template = scene_generator.SceneGenerator.find_matching_template(props.user_prompt)
+        
+        if template:
+            success, message = scene_generator.SceneGenerator.execute_blender_script(template)
+            if success:
+                self.report({'INFO'}, f"Created {props.user_prompt} using template!")
+                props.generated_code = template
+            else:
+                self.report({'ERROR'}, message)
+        else:
+            # Create simple fallback
+            success, message = scene_generator.SceneGenerator.create_simple_object_fallback(props.user_prompt)
+            if success:
+                self.report({'INFO'}, message)
+            else:
+                self.report({'ERROR'}, f"No template found for '{props.user_prompt}'. Try: chair, table, cube, sphere, house, tree, car, lamp, desk, bed")
+        
+        return {'FINISHED'}
+
+
 # List of classes to register
 classes = [
     LLM_OT_RunAndExecute,
@@ -300,6 +339,7 @@ classes = [
     LLM_OT_ClearResponse,
     LLM_OT_CopyCode,
     LLM_OT_TestCreate,
+    LLM_OT_QuickCreate,
 ]
 
 

@@ -9,8 +9,254 @@ import mathutils
 from typing import Optional
 
 
+# Pre-built templates for common 3D objects - these ALWAYS work
+OBJECT_TEMPLATES = {
+    'chair': """import bpy
+# Create chair seat
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))
+seat = bpy.context.object
+seat.name = 'Chair_Seat'
+seat.scale = (0.5, 0.5, 0.05)
+
+# Create chair back
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, -0.225, 0.85))
+back = bpy.context.object
+back.name = 'Chair_Back'
+back.scale = (0.5, 0.05, 0.35)
+
+# Create chair legs
+leg_positions = [(0.2, 0.2, 0.225), (-0.2, 0.2, 0.225), (0.2, -0.2, 0.225), (-0.2, -0.2, 0.225)]
+for i, pos in enumerate(leg_positions):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=pos)
+    leg = bpy.context.object
+    leg.name = f'Chair_Leg_{i+1}'
+    leg.scale = (0.05, 0.05, 0.225)
+""",
+
+    'table': """import bpy
+# Create table top
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.75))
+top = bpy.context.object
+top.name = 'Table_Top'
+top.scale = (1.0, 0.6, 0.05)
+
+# Create table legs
+leg_positions = [(0.45, 0.25, 0.35), (-0.45, 0.25, 0.35), (0.45, -0.25, 0.35), (-0.45, -0.25, 0.35)]
+for i, pos in enumerate(leg_positions):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=pos)
+    leg = bpy.context.object
+    leg.name = f'Table_Leg_{i+1}'
+    leg.scale = (0.05, 0.05, 0.35)
+""",
+
+    'cube': """import bpy
+bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
+bpy.context.object.name = 'Cube'
+""",
+
+    'sphere': """import bpy
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 1))
+bpy.context.object.name = 'Sphere'
+""",
+
+    'cylinder': """import bpy
+bpy.ops.mesh.primitive_cylinder_add(radius=0.5, depth=2, location=(0, 0, 1))
+bpy.context.object.name = 'Cylinder'
+""",
+
+    'cone': """import bpy
+bpy.ops.mesh.primitive_cone_add(radius1=1, depth=2, location=(0, 0, 1))
+bpy.context.object.name = 'Cone'
+""",
+
+    'torus': """import bpy
+bpy.ops.mesh.primitive_torus_add(location=(0, 0, 1))
+bpy.context.object.name = 'Torus'
+""",
+
+    'plane': """import bpy
+bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
+bpy.context.object.name = 'Plane'
+""",
+
+    'monkey': """import bpy
+bpy.ops.mesh.primitive_monkey_add(size=1, location=(0, 0, 1))
+bpy.context.object.name = 'Suzanne'
+""",
+
+    'house': """import bpy
+# Create house base
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))
+base = bpy.context.object
+base.name = 'House_Base'
+base.scale = (1, 0.8, 0.5)
+
+# Create roof
+bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=1.2, depth=0.6, location=(0, 0, 1.05))
+roof = bpy.context.object
+roof.name = 'House_Roof'
+roof.rotation_euler = (0, 0, 0.785)
+""",
+
+    'tree': """import bpy
+# Create trunk
+bpy.ops.mesh.primitive_cylinder_add(radius=0.15, depth=1.5, location=(0, 0, 0.75))
+trunk = bpy.context.object
+trunk.name = 'Tree_Trunk'
+
+# Create foliage
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.8, location=(0, 0, 1.8))
+foliage = bpy.context.object
+foliage.name = 'Tree_Foliage'
+""",
+
+    'car': """import bpy
+# Create car body
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.4))
+body = bpy.context.object
+body.name = 'Car_Body'
+body.scale = (1, 0.5, 0.25)
+
+# Create car top
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0.1, 0, 0.65))
+top = bpy.context.object
+top.name = 'Car_Top'
+top.scale = (0.5, 0.45, 0.15)
+
+# Create wheels
+wheel_positions = [(0.35, 0.3, 0.15), (-0.35, 0.3, 0.15), (0.35, -0.3, 0.15), (-0.35, -0.3, 0.15)]
+for i, pos in enumerate(wheel_positions):
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.15, depth=0.1, location=pos)
+    wheel = bpy.context.object
+    wheel.name = f'Car_Wheel_{i+1}'
+    wheel.rotation_euler = (1.5708, 0, 0)
+""",
+
+    'bed': """import bpy
+# Create mattress
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.3))
+mattress = bpy.context.object
+mattress.name = 'Bed_Mattress'
+mattress.scale = (1, 0.6, 0.15)
+
+# Create headboard
+bpy.ops.mesh.primitive_cube_add(size=1, location=(-0.45, 0, 0.55))
+headboard = bpy.context.object
+headboard.name = 'Bed_Headboard'
+headboard.scale = (0.05, 0.6, 0.25)
+
+# Create legs
+leg_positions = [(0.45, 0.25, 0.1), (-0.45, 0.25, 0.1), (0.45, -0.25, 0.1), (-0.45, -0.25, 0.1)]
+for i, pos in enumerate(leg_positions):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=pos)
+    leg = bpy.context.object
+    leg.name = f'Bed_Leg_{i+1}'
+    leg.scale = (0.05, 0.05, 0.1)
+""",
+
+    'lamp': """import bpy
+# Create lamp base
+bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=0.05, location=(0, 0, 0.025))
+base = bpy.context.object
+base.name = 'Lamp_Base'
+
+# Create lamp pole
+bpy.ops.mesh.primitive_cylinder_add(radius=0.03, depth=0.8, location=(0, 0, 0.45))
+pole = bpy.context.object
+pole.name = 'Lamp_Pole'
+
+# Create lamp shade
+bpy.ops.mesh.primitive_cone_add(radius1=0.3, radius2=0.1, depth=0.25, location=(0, 0, 0.95))
+shade = bpy.context.object
+shade.name = 'Lamp_Shade'
+""",
+
+    'desk': """import bpy
+# Create desk top
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.75))
+top = bpy.context.object
+top.name = 'Desk_Top'
+top.scale = (1.2, 0.6, 0.04)
+
+# Create desk legs
+leg_positions = [(0.55, 0.25, 0.365), (-0.55, 0.25, 0.365), (0.55, -0.25, 0.365), (-0.55, -0.25, 0.365)]
+for i, pos in enumerate(leg_positions):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=pos)
+    leg = bpy.context.object
+    leg.name = f'Desk_Leg_{i+1}'
+    leg.scale = (0.04, 0.04, 0.365)
+""",
+
+    'bookshelf': """import bpy
+# Create bookshelf sides
+bpy.ops.mesh.primitive_cube_add(size=1, location=(-0.45, 0, 0.75))
+left = bpy.context.object
+left.name = 'Shelf_Left'
+left.scale = (0.03, 0.25, 0.75)
+
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0.45, 0, 0.75))
+right = bpy.context.object
+right.name = 'Shelf_Right'
+right.scale = (0.03, 0.25, 0.75)
+
+# Create shelves
+shelf_heights = [0.0, 0.35, 0.7, 1.05, 1.4]
+for i, h in enumerate(shelf_heights):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, h + 0.05))
+    shelf = bpy.context.object
+    shelf.name = f'Shelf_{i+1}'
+    shelf.scale = (0.45, 0.25, 0.025)
+
+# Create back
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.24, 0.75))
+back = bpy.context.object
+back.name = 'Shelf_Back'
+back.scale = (0.45, 0.01, 0.75)
+""",
+}
+
+
 class SceneGenerator:
     """Handles 3D scene generation from LLM responses"""
+    
+    @staticmethod
+    def find_matching_template(prompt: str) -> Optional[str]:
+        """
+        Find a matching template for the given prompt
+        
+        Args:
+            prompt: User prompt
+            
+        Returns:
+            Template code or None
+        """
+        prompt_lower = prompt.lower()
+        
+        # Check for exact matches first
+        for key in OBJECT_TEMPLATES:
+            if key in prompt_lower:
+                print(f"[DEBUG] Found matching template: {key}")
+                return OBJECT_TEMPLATES[key]
+        
+        # Check for similar terms
+        synonyms = {
+            'chair': ['seat', 'stool'],
+            'table': ['desk', 'surface'],
+            'sphere': ['ball', 'orb', 'globe'],
+            'cube': ['box', 'block'],
+            'house': ['building', 'home'],
+            'tree': ['plant'],
+            'car': ['vehicle', 'automobile'],
+            'lamp': ['light', 'lantern'],
+        }
+        
+        for key, terms in synonyms.items():
+            for term in terms:
+                if term in prompt_lower:
+                    print(f"[DEBUG] Found synonym match: {term} -> {key}")
+                    return OBJECT_TEMPLATES[key]
+        
+        return None
     
     @staticmethod
     def sanitize_code(code: str) -> str:
@@ -29,14 +275,17 @@ class SceneGenerator:
         lines_to_remove = [
             'active_layer_collection',
             'view_layer.active_layer_collection',
-            'bpy.context.view_layer.active_layer_collection',
             '.link(light)',
             '.link(camera)',
             '.link(lamp)',
-            'collection.objects.link(light',
-            'collection.objects.link(lamp',
-            'scene.collection.objects.link(light',
-            'scene.collection.objects.link(lamp',
+            'collection.objects.link(',
+            'scene.collection.objects.link(',
+            'mathutils.Vector(',
+            'bpy.data.lights.new(',
+            'bpy.data.cameras.new(',
+            'bpy.data.objects.new(',
+            '.modifiers.add',
+            'bpy.ops.object.modifier_add',
         ]
         
         sanitized_lines = []
@@ -52,29 +301,6 @@ class SceneGenerator:
         
         code = '\n'.join(sanitized_lines)
         
-        # Replace common incorrect patterns
-        replacements = [
-            # Fix active_object assignment issues
-            ('bpy.context.active_object = ', '# '),
-            ('context.active_object = ', '# '),
-            
-            # Fix collection linking for lights - use bpy.ops instead
-            ('bpy.data.lights.new(', '# Light creation simplified - '),
-            ('bpy.data.objects.new(name=', 'bpy.ops.object.light_add(type="POINT", location=(0,0,3)) # '),
-            
-            # Fix scene.objects.link (deprecated)
-            ('bpy.context.scene.objects.link(', '# Deprecated: '),
-            ('scene.objects.link(', '# Deprecated: '),
-            
-            # Fix incorrect collection access
-            ('bpy.context.scene.collection.objects.link(bpy.data.objects', '# Fixed: '),
-        ]
-        
-        for old, new in replacements:
-            if old in code:
-                print(f"[DEBUG] Replacing: {old} -> {new}")
-                code = code.replace(old, new)
-        
         # Ensure import bpy is present
         if 'import bpy' not in code:
             code = 'import bpy\n' + code
@@ -86,12 +312,6 @@ class SceneGenerator:
     def extract_python_code(response: str) -> Optional[str]:
         """
         Extract Python code from LLM response
-        
-        Args:
-            response: LLM response text
-            
-        Returns:
-            Extracted Python code or None
         """
         print("[DEBUG] Attempting code extraction...")
         
@@ -108,40 +328,26 @@ class SceneGenerator:
         matches = re.findall(pattern, response, re.DOTALL)
         
         if matches:
-            print(f"[DEBUG] Found {len(matches)} generic code block(s)")
-            # Check if it looks like Python code
             code = matches[0].strip()
             if 'bpy' in code.lower() or 'import' in code.lower():
-                print("[DEBUG] Code block contains bpy/import - using it")
                 return code
         
         # If no code blocks found, check if the entire response is code
         if 'bpy.' in response or 'import bpy' in response.lower():
-            print("[DEBUG] Response contains bpy - using entire response as code")
             return response.strip()
         
-        print("[DEBUG] No code patterns found in response")
         return None
     
     @staticmethod
     def execute_blender_script(code: str, library_imports: str = "") -> tuple[bool, str]:
         """
         Execute Python code in Blender
-        
-        Args:
-            code: Python code to execute
-            library_imports: Additional library imports
-            
-        Returns:
-            Tuple of (success: bool, message: str)
         """
         try:
-            # Prepare the execution environment with proper context
+            # Prepare the execution environment
             exec_globals = {
                 'bpy': bpy,
                 'mathutils': mathutils,
-                'C': bpy.context,
-                'D': bpy.data,
                 '__name__': '__main__'
             }
             
@@ -150,7 +356,6 @@ class SceneGenerator:
             if library_imports:
                 full_code = f"{library_imports}\n\n{code}"
             
-            # Print code for debugging (visible in Blender console)
             print("\n" + "="*50)
             print("Executing Blender Script:")
             print("="*50)
@@ -160,18 +365,10 @@ class SceneGenerator:
             # Execute the code
             exec(full_code, exec_globals)
             
-            # Update scene to ensure objects persist
-            if bpy.context.view_layer:
-                bpy.context.view_layer.update()
+            # Update scene
+            bpy.context.view_layer.update()
             
-            # Update depsgraph for proper object registration
-            if bpy.context.evaluated_depsgraph_get:
-                bpy.context.evaluated_depsgraph_get().update()
-            
-            # Count created objects for feedback
-            created_count = len([obj for obj in bpy.data.objects if obj.select_get()])
-            
-            return True, f"Script executed successfully! {created_count} object(s) in viewport."
+            return True, "Script executed successfully!"
             
         except Exception as e:
             error_msg = f"Error executing script: {str(e)}"
@@ -181,78 +378,65 @@ class SceneGenerator:
     @staticmethod
     def generate_enhanced_prompt(prompt: str, with_steps: bool = False) -> str:
         """
-        Enhance user prompt with additional context for better 3D generation
-        
-        Args:
-            prompt: Original user prompt
-            with_steps: Whether to add step-by-step instructions
-            
-        Returns:
-            Enhanced prompt
+        Enhance user prompt for better LLM response
         """
         base_context = (
-            "Generate ONLY Python code for Blender using bpy.ops functions. "
-            "Wrap in ```python blocks. No explanations.\n"
-            "RULES: Use ONLY bpy.ops for creating objects. Do NOT use collection.objects.link(). "
-            "Do NOT create lights manually. Do NOT modify active_layer_collection.\n\n"
+            "Generate ONLY simple Python code for Blender. Use bpy.ops ONLY.\n"
+            "RULES:\n"
+            "- Use bpy.ops.mesh.primitive_cube_add() for cubes\n"
+            "- Use bpy.ops.mesh.primitive_uv_sphere_add() for spheres\n"
+            "- Use bpy.ops.mesh.primitive_cylinder_add() for cylinders\n"
+            "- Use bpy.context.object to get last created object\n"
+            "- Use .scale = (x, y, z) for scaling\n"
+            "- Use .location = (x, y, z) for positioning\n"
+            "- Do NOT use collection.objects.link()\n"
+            "- Do NOT use mathutils.Vector()\n"
+            "- Do NOT use bpy.data.objects.new()\n"
+            "- Do NOT use modifiers\n"
+            "Wrap code in ```python blocks.\n\n"
         )
         
         if with_steps:
             steps = (
-                "EXAMPLE for chair:\n"
+                "EXAMPLE:\n"
                 "```python\n"
                 "import bpy\n"
-                "# Seat\n"
                 "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))\n"
-                "bpy.context.object.name = 'Seat'\n"
+                "bpy.context.object.name = 'MyCube'\n"
                 "bpy.context.object.scale = (1, 1, 0.1)\n"
-                "# Legs\n"
-                "for x, y in [(-0.4, -0.4), (0.4, -0.4), (-0.4, 0.4), (0.4, 0.4)]:\n"
-                "    bpy.ops.mesh.primitive_cube_add(size=0.1, location=(x, y, 0.25))\n"
-                "    bpy.context.object.scale = (1, 1, 5)\n"
                 "```\n\n"
             )
             base_context += steps
         
         enhanced = base_context + f"CREATE: {prompt}\n"
-        
         return enhanced
     
     @staticmethod
     def create_simple_object_fallback(object_name: str) -> tuple[bool, str]:
         """
-        Create a simple 3D object as fallback when LLM doesn't return valid code
-        
-        Args:
-            object_name: Name/type of object to create
-            
-        Returns:
-            Tuple of (success: bool, message: str)
+        Create a simple 3D object as fallback
         """
         try:
             object_name = object_name.lower()
             
-            # Determine object type from name
             if 'cube' in object_name or 'box' in object_name:
                 bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
             elif 'sphere' in object_name or 'ball' in object_name:
                 bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 1))
             elif 'cylinder' in object_name:
-                bpy.ops.mesh.primitive_cylinder_add(radius=1, depth=2, location=(0, 0, 1))
+                bpy.ops.mesh.primitive_cylinder_add(radius=0.5, depth=2, location=(0, 0, 1))
             elif 'cone' in object_name:
                 bpy.ops.mesh.primitive_cone_add(radius1=1, depth=2, location=(0, 0, 1))
             elif 'torus' in object_name:
                 bpy.ops.mesh.primitive_torus_add(location=(0, 0, 1))
             elif 'plane' in object_name or 'floor' in object_name:
-                bpy.ops.mesh.primitive_plane_add(size=10, location=(0, 0, 0))
+                bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
             elif 'monkey' in object_name or 'suzanne' in object_name:
-                bpy.ops.mesh.primitive_monkey_add(size=2, location=(0, 0, 1))
+                bpy.ops.mesh.primitive_monkey_add(size=1, location=(0, 0, 1))
             else:
-                # Default to cube
                 bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
             
-            # Get the active object
-            obj = bpy.context.active_object
+            obj = bpy.context.object
             obj.name = object_name.title()
             
             return True, f"Created simple {object_name}"
@@ -262,49 +446,51 @@ class SceneGenerator:
 
 
 def process_llm_response(response: str, library_imports: str = "", 
-                         create_fallback: bool = False) -> tuple[bool, str, Optional[str]]:
+                         create_fallback: bool = True, 
+                         original_prompt: str = "") -> tuple[bool, str, Optional[str]]:
     """
     Process LLM response and execute in Blender
-    
-    Args:
-        response: LLM response text
-        library_imports: Additional library imports
-        create_fallback: Whether to create fallback object if no code found
-        
-    Returns:
-        Tuple of (success: bool, message: str, code: Optional[str])
     """
     generator = SceneGenerator()
     
     print("\n" + "#"*60)
     print("[DEBUG] Processing LLM Response")
     print("#"*60)
-    print(f"[DEBUG] Response length: {len(response)} characters")
-    print(f"[DEBUG] First 200 chars: {response[:200]}...")
-    print("#"*60)
     
-    # Extract Python code
+    # FIRST: Try to use a pre-built template (most reliable)
+    if original_prompt:
+        template = generator.find_matching_template(original_prompt)
+        if template:
+            print("[DEBUG] Using pre-built template (most reliable)")
+            success, message = generator.execute_blender_script(template, library_imports)
+            if success:
+                return True, message + " (Used optimized template)", template
+    
+    # SECOND: Try to extract and execute LLM code
     code = generator.extract_python_code(response)
     
     if code:
-        print(f"[DEBUG] ✓ Code extracted successfully ({len(code)} chars)")
-        print(f"[DEBUG] Extracted code:\n{code}")
-        print("#"*60)
-        
-        # Sanitize the code to fix common LLM mistakes
+        print(f"[DEBUG] Extracted LLM code ({len(code)} chars)")
         sanitized_code = generator.sanitize_code(code)
-        print(f"[DEBUG] Sanitized code:\n{sanitized_code}")
-        print("#"*60)
-        
         success, message = generator.execute_blender_script(sanitized_code, library_imports)
-        return success, message, sanitized_code
-    else:
-        print("[DEBUG] ✗ No code found in response")
-        print(f"[DEBUG] Full response:\n{response}")
-        print("#"*60)
-        if create_fallback:
-            # Try to create a simple object based on response
-            success, message = generator.create_simple_object_fallback(response)
-            return success, message, None
+        
+        if success:
+            return True, message, sanitized_code
         else:
-            return False, "No executable Python code found in LLM response. Enable 'Enhance Prompt with Steps' and try again.", None
+            print(f"[DEBUG] LLM code failed: {message}")
+            # Try template as fallback
+            if original_prompt:
+                template = generator.find_matching_template(original_prompt)
+                if template:
+                    print("[DEBUG] Falling back to template")
+                    success2, message2 = generator.execute_blender_script(template, library_imports)
+                    if success2:
+                        return True, message2 + " (Template fallback)", template
+    
+    # THIRD: Create simple fallback object
+    if create_fallback and original_prompt:
+        print("[DEBUG] Using simple fallback")
+        success, message = generator.create_simple_object_fallback(original_prompt)
+        return success, message, None
+    
+    return False, "Could not generate 3D scene. Try a simpler prompt like 'chair', 'table', or 'cube'.", None

@@ -204,18 +204,35 @@ class VIEW3D_PT_LLM_MainPanel(Panel):
         
         # Main Actions
         box = layout.box()
+        box.label(text="Actions", icon='PLAY')
+        
+        # Quick Create - uses templates (INSTANT)
         row = box.row(align=True)
         row.scale_y = 1.5
-        row.operator("llm.run_and_execute", text="Run & Execute", icon='PLAY')
+        row.operator("llm.quick_create", text="⚡ Quick Create (Instant)", icon='ADD')
+        
+        # Run with LLM
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator("llm.run_and_execute", text="🤖 Run & Execute (LLM)", icon='PLAY')
         
         row = box.row(align=True)
-        row.operator("llm.send_prompt", text="Send Prompt (Preview)", icon='EXPORT')
+        row.operator("llm.send_prompt", text="Send Prompt", icon='EXPORT')
         row.operator("llm.execute_response", text="Execute", icon='CONSOLE')
         
         # Test button
         box.separator()
         test_row = box.row()
         test_row.operator("llm.test_create", text="🧪 Test: Create Cube", icon='MESH_CUBE')
+        
+        # Supported templates info
+        help_box = layout.box()
+        help_box.label(text="⚡ Quick Create supports:", icon='INFO')
+        col = help_box.column(align=True)
+        col.scale_y = 0.8
+        col.label(text="chair, table, desk, bed, lamp, bookshelf")
+        col.label(text="cube, sphere, cylinder, cone, torus, plane")
+        col.label(text="house, tree, car, monkey")
         
         # Response Display
         box = layout.box()
