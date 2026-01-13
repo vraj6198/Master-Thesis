@@ -230,32 +230,44 @@ class SceneGenerator:
         Returns:
             Template code or None
         """
-        prompt_lower = prompt.lower()
+        prompt_lower = prompt.lower().strip()
+        
+        # Remove common words to find the object
+        remove_words = ['create', 'make', 'build', 'generate', 'add', 'one', 'a', 'an', 'the', 'simple', 'basic', 'new']
+        cleaned = prompt_lower
+        for word in remove_words:
+            cleaned = cleaned.replace(word, ' ')
+        cleaned = ' '.join(cleaned.split()).strip()  # Remove extra spaces
+        
+        print(f"[DEBUG] Looking for template. Original: '{prompt_lower}', Cleaned: '{cleaned}'")
         
         # Check for exact matches first
         for key in OBJECT_TEMPLATES:
-            if key in prompt_lower:
+            if key in cleaned or key in prompt_lower:
                 print(f"[DEBUG] Found matching template: {key}")
                 return OBJECT_TEMPLATES[key]
         
         # Check for similar terms
         synonyms = {
-            'chair': ['seat', 'stool'],
-            'table': ['desk', 'surface'],
+            'chair': ['seat', 'stool', 'seating'],
+            'table': ['surface'],
             'sphere': ['ball', 'orb', 'globe'],
             'cube': ['box', 'block'],
-            'house': ['building', 'home'],
+            'house': ['building', 'home', 'hut'],
             'tree': ['plant'],
-            'car': ['vehicle', 'automobile'],
-            'lamp': ['light', 'lantern'],
+            'car': ['vehicle', 'automobile', 'auto'],
+            'lamp': ['light', 'lantern', 'lighting'],
+            'desk': ['workstation', 'workspace'],
+            'bed': ['mattress', 'cot'],
         }
         
         for key, terms in synonyms.items():
             for term in terms:
-                if term in prompt_lower:
+                if term in cleaned or term in prompt_lower:
                     print(f"[DEBUG] Found synonym match: {term} -> {key}")
                     return OBJECT_TEMPLATES[key]
         
+        print(f"[DEBUG] No template found for: '{cleaned}'")
         return None
     
     @staticmethod
@@ -286,6 +298,23 @@ class SceneGenerator:
             'bpy.data.objects.new(',
             '.modifiers.add',
             'bpy.ops.object.modifier_add',
+            'from bpy.types import',
+            'import Lamp',
+            'import Light',
+            'import Camera',
+            'bpy.types.Lamp',
+            'bpy.types.Light',
+            'mode_set(',
+            'editmode_toggle',
+            'bpy.ops.object.mode_set',
+            '.data.energy',
+            '.data.color',
+            'material.diffuse_color',
+            'principled',
+            'nodes[',
+            'node_tree',
+            'use_nodes',
+            'bpy.data.materials',
         ]
         
         sanitized_lines = []
@@ -304,6 +333,11 @@ class SceneGenerator:
         # Ensure import bpy is present
         if 'import bpy' not in code:
             code = 'import bpy\n' + code
+        
+        # Check if code still has any bpy operations
+        if 'bpy.ops' not in code and 'bpy.context' not in code:
+            print("[DEBUG] Code has no valid bpy operations after sanitization")
+            return ""
         
         print("[DEBUG] Code sanitization complete")
         return code
@@ -417,29 +451,45 @@ class SceneGenerator:
         Create a simple 3D object as fallback
         """
         try:
-            object_name = object_name.lower()
+            # Clean the input
+            clean_name = object_name.lower().strip()
+            remove_words = ['create', 'make', 'build', 'generate', 'add', 'one', 'a', 'an', 'the', 'simple', 'basic', 'new']
+            for word in remove_words:
+                clean_name = clean_name.replace(word, ' ')
+            clean_name = ' '.join(clean_name.split()).strip()
             
-            if 'cube' in object_name or 'box' in object_name:
+            print(f"[DEBUG] Fallback for: '{clean_name}'")
+            
+            if 'cube' in clean_name or 'box' in clean_name or 'block' in clean_name:
                 bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
-            elif 'sphere' in object_name or 'ball' in object_name:
+                name = 'Cube'
+            elif 'sphere' in clean_name or 'ball' in clean_name:
                 bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 1))
-            elif 'cylinder' in object_name:
+                name = 'Sphere'
+            elif 'cylinder' in clean_name:
                 bpy.ops.mesh.primitive_cylinder_add(radius=0.5, depth=2, location=(0, 0, 1))
-            elif 'cone' in object_name:
+                name = 'Cylinder'
+            elif 'cone' in clean_name:
                 bpy.ops.mesh.primitive_cone_add(radius1=1, depth=2, location=(0, 0, 1))
-            elif 'torus' in object_name:
+                name = 'Cone'
+            elif 'torus' in clean_name or 'donut' in clean_name:
                 bpy.ops.mesh.primitive_torus_add(location=(0, 0, 1))
-            elif 'plane' in object_name or 'floor' in object_name:
+                name = 'Torus'
+            elif 'plane' in clean_name or 'floor' in clean_name:
                 bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
-            elif 'monkey' in object_name or 'suzanne' in object_name:
+                name = 'Plane'
+            elif 'monkey' in clean_name or 'suzanne' in clean_name:
                 bpy.ops.mesh.primitive_monkey_add(size=1, location=(0, 0, 1))
+                name = 'Suzanne'
             else:
+                # Default: create a cube
                 bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
+                name = 'Object'
             
             obj = bpy.context.object
-            obj.name = object_name.title()
+            obj.name = name
             
-            return True, f"Created simple {object_name}"
+            return True, f"Created {name}"
             
         except Exception as e:
             return False, f"Error creating fallback object: {str(e)}"
@@ -454,43 +504,41 @@ def process_llm_response(response: str, library_imports: str = "",
     generator = SceneGenerator()
     
     print("\n" + "#"*60)
-    print("[DEBUG] Processing LLM Response")
+    print("[DEBUG] Processing Response")
     print("#"*60)
     
-    # FIRST: Try to use a pre-built template (most reliable)
+    # FIRST: ALWAYS try to use a pre-built template (most reliable)
     if original_prompt:
         template = generator.find_matching_template(original_prompt)
         if template:
-            print("[DEBUG] Using pre-built template (most reliable)")
+            print("[DEBUG] ✓ Found matching template - using it (most reliable)")
             success, message = generator.execute_blender_script(template, library_imports)
             if success:
-                return True, message + " (Used optimized template)", template
+                return True, message + " (Template used)", template
+            else:
+                print(f"[DEBUG] Template execution failed: {message}")
     
-    # SECOND: Try to extract and execute LLM code
-    code = generator.extract_python_code(response)
-    
-    if code:
-        print(f"[DEBUG] Extracted LLM code ({len(code)} chars)")
-        sanitized_code = generator.sanitize_code(code)
-        success, message = generator.execute_blender_script(sanitized_code, library_imports)
+    # SECOND: Try to extract and execute LLM code (if template not found)
+    if response:
+        code = generator.extract_python_code(response)
         
-        if success:
-            return True, message, sanitized_code
-        else:
-            print(f"[DEBUG] LLM code failed: {message}")
-            # Try template as fallback
-            if original_prompt:
-                template = generator.find_matching_template(original_prompt)
-                if template:
-                    print("[DEBUG] Falling back to template")
-                    success2, message2 = generator.execute_blender_script(template, library_imports)
-                    if success2:
-                        return True, message2 + " (Template fallback)", template
+        if code:
+            print(f"[DEBUG] Trying LLM code ({len(code)} chars)")
+            sanitized_code = generator.sanitize_code(code)
+            
+            if sanitized_code and len(sanitized_code) > 20:  # Valid code remaining
+                success, message = generator.execute_blender_script(sanitized_code, library_imports)
+                
+                if success:
+                    return True, message, sanitized_code
+                else:
+                    print(f"[DEBUG] LLM code failed: {message}")
     
     # THIRD: Create simple fallback object
     if create_fallback and original_prompt:
-        print("[DEBUG] Using simple fallback")
+        print("[DEBUG] Using simple fallback object")
         success, message = generator.create_simple_object_fallback(original_prompt)
-        return success, message, None
+        if success:
+            return True, message + " (Fallback)", None
     
-    return False, "Could not generate 3D scene. Try a simpler prompt like 'chair', 'table', or 'cube'.", None
+    return False, "Could not generate 3D scene. Try: chair, table, cube, sphere", None
