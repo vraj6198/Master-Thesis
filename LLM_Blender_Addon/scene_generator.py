@@ -59,14 +59,12 @@ class SceneGenerator:
             Tuple of (success: bool, message: str)
         """
         try:
-            # Ensure we're in OBJECT mode (prevents issues with object creation)
-            if bpy.context.object and bpy.context.object.mode != 'OBJECT':
-                bpy.ops.object.mode_set(mode='OBJECT')
-            
-            # Prepare the execution environment
+            # Prepare the execution environment with proper context
             exec_globals = {
                 'bpy': bpy,
                 'mathutils': mathutils,
+                'C': bpy.context,
+                'D': bpy.data,
                 '__name__': '__main__'
             }
             
@@ -85,16 +83,18 @@ class SceneGenerator:
             # Execute the code
             exec(full_code, exec_globals)
             
-            # Force viewport update to ensure objects are visible and persist
-            bpy.context.view_layer.update()
+            # Update scene to ensure objects persist
+            if bpy.context.view_layer:
+                bpy.context.view_layer.update()
             
-            # Refresh all areas to show the new objects
-            for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    if area.type == 'VIEW_3D':
-                        area.tag_redraw()
+            # Update depsgraph for proper object registration
+            if bpy.context.evaluated_depsgraph_get:
+                bpy.context.evaluated_depsgraph_get().update()
             
-            return True, "Script executed successfully! Check 3D viewport."
+            # Count created objects for feedback
+            created_count = len([obj for obj in bpy.data.objects if obj.select_get()])
+            
+            return True, f"Script executed successfully! {created_count} object(s) in viewport."
             
         except Exception as e:
             error_msg = f"Error executing script: {str(e)}"
@@ -131,18 +131,20 @@ class SceneGenerator:
                 "```python\n"
                 "import bpy\n"
                 "bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))\n"
-                "bpy.context.active_object.name = 'MyCube'\n"
+                "obj = bpy.context.object\n"
+                "obj.name = 'MyCube'\n"
                 "```\n\n"
                 "EXAMPLE - Creating multiple objects:\n"
                 "```python\n"
                 "import bpy\n"
-                "# Chair\n"
+                "# Chair seat\n"
                 "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))\n"
-                "bpy.context.active_object.name = 'ChairSeat'\n"
-                "# Table\n"
+                "bpy.context.object.name = 'ChairSeat'\n"
+                "# Table top\n"
                 "bpy.ops.mesh.primitive_cube_add(size=2, location=(3, 0, 1))\n"
-                "bpy.context.active_object.name = 'TableTop'\n"
+                "bpy.context.object.name = 'TableTop'\n"
                 "```\n\n"
+                "IMPORTANT: Use bpy.context.object (not active_object) to get the last created object.\n\n"
             )
             base_context += steps
         

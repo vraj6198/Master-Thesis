@@ -37,6 +37,13 @@ class LLM_OT_RunAndExecute(Operator):
             self.report({'ERROR'}, "Please set Gemini API key in addon preferences")
             return {'CANCELLED'}
         
+        # Ensure we're in OBJECT mode
+        if context.object and context.object.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+        
+        # Deselect all objects to have a clean state
+        bpy.ops.object.select_all(action='DESELECT')
+        
         # Prepare prompt
         prompt = props.user_prompt
         if props.enhance_prompt:
@@ -92,6 +99,12 @@ class LLM_OT_RunAndExecute(Operator):
             self.report({'INFO'}, message)
             if code:
                 props.generated_code = code
+            
+            # Force final viewport update
+            context.view_layer.update()
+            for area in context.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
         else:
             self.report({'WARNING'}, message)
         
