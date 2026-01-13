@@ -23,25 +23,25 @@ class SceneGenerator:
         Returns:
             Extracted Python code or None
         """
-        # Try to extract code from markdown code blocks
-        pattern = r'```python\n(.*?)```'
-        matches = re.findall(pattern, response, re.DOTALL)
+        # Try to extract code from markdown code blocks with python
+        pattern = r'```python\s*(.*?)```'
+        matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
         
         if matches:
             return matches[0].strip()
         
         # Try without language specification
-        pattern = r'```\n(.*?)```'
+        pattern = r'```\s*(.*?)```'
         matches = re.findall(pattern, response, re.DOTALL)
         
         if matches:
             # Check if it looks like Python code
             code = matches[0].strip()
-            if 'bpy.' in code or 'import' in code:
+            if 'bpy' in code.lower() or 'import' in code.lower():
                 return code
         
         # If no code blocks found, check if the entire response is code
-        if 'bpy.' in response or ('import' in response and 'def' in response):
+        if 'bpy.' in response or 'import bpy' in response.lower():
             return response.strip()
         
         return None
@@ -59,6 +59,10 @@ class SceneGenerator:
             Tuple of (success: bool, message: str)
         """
         try:
+            # Ensure we're in OBJECT mode (prevents issues with object creation)
+            if bpy.context.object and bpy.context.object.mode != 'OBJECT':
+                bpy.ops.object.mode_set(mode='OBJECT')
+            
             # Prepare the execution environment
             exec_globals = {
                 'bpy': bpy,
@@ -71,13 +75,31 @@ class SceneGenerator:
             if library_imports:
                 full_code = f"{library_imports}\n\n{code}"
             
+            # Print code for debugging (visible in Blender console)
+            print("\n" + "="*50)
+            print("Executing Blender Script:")
+            print("="*50)
+            print(full_code)
+            print("="*50 + "\n")
+            
             # Execute the code
             exec(full_code, exec_globals)
             
-            return True, "Script executed successfully!"
+            # Force viewport update to ensure objects are visible and persist
+            bpy.context.view_layer.update()
+            
+            # Refresh all areas to show the new objects
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        area.tag_redraw()
+            
+            return True, "Script executed successfully! Check 3D viewport."
             
         except Exception as e:
-            return False, f"Error executing script: {str(e)}"
+            error_msg = f"Error executing script: {str(e)}"
+            print(f"\n[ERROR] {error_msg}\n")
+            return False, error_msg
     
     @staticmethod
     def generate_enhanced_prompt(prompt: str, with_steps: bool = False) -> str:
@@ -92,26 +114,40 @@ class SceneGenerator:
             Enhanced prompt
         """
         base_context = (
-            "You are a Blender Python script generator. "
-            "Generate complete, executable Python code using the Blender API (bpy) "
-            "to create 3D objects and scenes in Blender. "
-            "The code should be production-ready and handle common edge cases. "
-            "Always use bpy.ops, bpy.data, and bpy.context appropriately.\n\n"
+            "You are a Blender Python code generator. Generate ONLY executable Python code using bpy (Blender Python API).\n"
+            "IMPORTANT RULES:\n"
+            "- Write complete, working Python code that can execute in Blender\n"
+            "- Import bpy at the start\n"
+            "- Use bpy.ops for operations (like bpy.ops.mesh.primitive_cube_add())\n"
+            "- Set locations using location parameter\n"
+            "- Give objects proper names\n"
+            "- Do NOT delete any objects unless specifically requested\n"
+            "- Do NOT include explanations or comments outside code blocks\n\n"
         )
         
         if with_steps:
             steps = (
-                "Follow these steps:\n"
-                "1. Import necessary modules (bpy, mathutils, etc.)\n"
-                "2. Delete default objects if needed (optional)\n"
-                "3. Create the requested 3D objects with proper materials\n"
-                "4. Set up lighting and camera if appropriate\n"
-                "5. Apply transformations and modifiers as needed\n\n"
+                "EXAMPLE - Creating a cube:\n"
+                "```python\n"
+                "import bpy\n"
+                "bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))\n"
+                "bpy.context.active_object.name = 'MyCube'\n"
+                "```\n\n"
+                "EXAMPLE - Creating multiple objects:\n"
+                "```python\n"
+                "import bpy\n"
+                "# Chair\n"
+                "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))\n"
+                "bpy.context.active_object.name = 'ChairSeat'\n"
+                "# Table\n"
+                "bpy.ops.mesh.primitive_cube_add(size=2, location=(3, 0, 1))\n"
+                "bpy.context.active_object.name = 'TableTop'\n"
+                "```\n\n"
             )
             base_context += steps
         
-        enhanced = base_context + f"User request: {prompt}\n\n"
-        enhanced += "Provide only the Python code wrapped in ```python code blocks."
+        enhanced = base_context + f"NOW CREATE: {prompt}\n\n"
+        enhanced += "Respond with ONLY the Python code in ```python code blocks. No explanations."
         
         return enhanced
     

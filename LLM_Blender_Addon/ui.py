@@ -89,7 +89,7 @@ class LLMPropertyGroup(PropertyGroup):
     system_prompt: StringProperty(
         name="System Prompt",
         description="System instructions for the LLM",
-        default="You are a helpful Blender Python script generator. Generate clean, executable code."
+        default="Generate only Python code using bpy (Blender API). No explanations. Use ```python code blocks."
     )
     
     # User prompt
