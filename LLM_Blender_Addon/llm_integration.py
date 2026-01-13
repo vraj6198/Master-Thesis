@@ -30,21 +30,37 @@ class LLMIntegration:
         try:
             model_to_use = custom_model if custom_model else model
             
+            print(f"[DEBUG] Calling Ollama model: {model_to_use}")
+            print(f"[DEBUG] Prompt length: {len(prompt)} chars")
+            
             url = f"{server_url}/api/generate"
             payload = {
                 "model": model_to_use,
                 "prompt": prompt,
-                "stream": False
+                "stream": False,
+                "options": {
+                    "num_predict": 512,  # Limit response length for speed
+                    "temperature": 0.3,  # Lower temperature for more focused output
+                    "top_p": 0.9,
+                    "top_k": 40
+                }
             }
             
             if system_prompt:
                 payload["system"] = system_prompt
             
-            response = requests.post(url, json=payload, timeout=120)
+            print("[DEBUG] Sending request to Ollama...")
+            response = requests.post(url, json=payload, timeout=60)  # Reduced from 120s
             response.raise_for_status()
             
             result = response.json()
+            print("[DEBUG] Response received from Ollama")
             return True, result.get("response", "")
+            
+        except requests.exceptions.ConnectionError:
+            return False, "Error: Cannot connect to Ollama. Make sure Ollama is running."
+        except requests.exceptions.Timeout:
+            return False, "Error: Request timed out. Try a simpler prompt or check Ollama performance."
             
         except requests.exceptions.ConnectionError:
             return False, "Error: Cannot connect to Ollama. Make sure Ollama is running."
@@ -86,10 +102,11 @@ class LLMIntegration:
             payload = {
                 "model": model,
                 "messages": messages,
-                "temperature": 0.7
+                "temperature": 0.3,  # Lower for focused output
+                "max_tokens": 512  # Limit for faster responses
             }
             
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, timeout=30)  # Reduced from 60s
             response.raise_for_status()
             
             result = response.json()
@@ -143,12 +160,12 @@ class LLMIntegration:
                     }]
                 }],
                 "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 2048
+                    "temperature": 0.3,  # Lower for focused output
+                    "maxOutputTokens": 512  # Reduced for speed
                 }
             }
             
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, timeout=30)  # Reduced from 60s
             response.raise_for_status()
             
             result = response.json()

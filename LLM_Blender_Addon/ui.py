@@ -165,6 +165,10 @@ class VIEW3D_PT_LLM_MainPanel(Panel):
         if props.llm_provider == 'ollama':
             box.prop(props, "ollama_models", text="Select Model")
             box.prop(props, "custom_model", text="Custom Model (Optional)")
+            # Performance tip
+            col = box.column()
+            col.scale_y = 0.7
+            col.label(text="💡 Tip: Smaller models = faster", icon='INFO')
         elif props.llm_provider == 'openai':
             box.prop(props, "openai_models", text="Select Model")
             # Show warning if no API key
@@ -207,6 +211,11 @@ class VIEW3D_PT_LLM_MainPanel(Panel):
         row = box.row(align=True)
         row.operator("llm.send_prompt", text="Send Prompt (Preview)", icon='EXPORT')
         row.operator("llm.execute_response", text="Execute", icon='CONSOLE')
+        
+        # Test button
+        box.separator()
+        test_row = box.row()
+        test_row.operator("llm.test_create", text="🧪 Test: Create Cube", icon='MESH_CUBE')
         
         # Response Display
         box = layout.box()

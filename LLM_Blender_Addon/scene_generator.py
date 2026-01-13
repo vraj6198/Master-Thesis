@@ -23,11 +23,14 @@ class SceneGenerator:
         Returns:
             Extracted Python code or None
         """
+        print("[DEBUG] Attempting code extraction...")
+        
         # Try to extract code from markdown code blocks with python
         pattern = r'```python\s*(.*?)```'
         matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
         
         if matches:
+            print(f"[DEBUG] Found {len(matches)} python code block(s)")
             return matches[0].strip()
         
         # Try without language specification
@@ -35,15 +38,19 @@ class SceneGenerator:
         matches = re.findall(pattern, response, re.DOTALL)
         
         if matches:
+            print(f"[DEBUG] Found {len(matches)} generic code block(s)")
             # Check if it looks like Python code
             code = matches[0].strip()
             if 'bpy' in code.lower() or 'import' in code.lower():
+                print("[DEBUG] Code block contains bpy/import - using it")
                 return code
         
         # If no code blocks found, check if the entire response is code
         if 'bpy.' in response or 'import bpy' in response.lower():
+            print("[DEBUG] Response contains bpy - using entire response as code")
             return response.strip()
         
+        print("[DEBUG] No code patterns found in response")
         return None
     
     @staticmethod
@@ -114,42 +121,22 @@ class SceneGenerator:
             Enhanced prompt
         """
         base_context = (
-            "You are a Blender Python code generator. Generate ONLY executable Python code using bpy (Blender Python API).\n"
-            "IMPORTANT RULES:\n"
-            "- Write complete, working Python code that can execute in Blender\n"
-            "- Import bpy at the start\n"
-            "- Use bpy.ops for operations (like bpy.ops.mesh.primitive_cube_add())\n"
-            "- Set locations using location parameter\n"
-            "- Give objects proper names\n"
-            "- Do NOT delete any objects unless specifically requested\n"
-            "- Do NOT include explanations or comments outside code blocks\n\n"
+            "Generate ONLY Python code for Blender. Use bpy module. "
+            "Wrap in ```python blocks. No explanations.\n\n"
         )
         
         if with_steps:
             steps = (
-                "EXAMPLE - Creating a cube:\n"
+                "EXAMPLE:\n"
                 "```python\n"
                 "import bpy\n"
                 "bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))\n"
-                "obj = bpy.context.object\n"
-                "obj.name = 'MyCube'\n"
+                "bpy.context.object.name = 'MyCube'\n"
                 "```\n\n"
-                "EXAMPLE - Creating multiple objects:\n"
-                "```python\n"
-                "import bpy\n"
-                "# Chair seat\n"
-                "bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.5))\n"
-                "bpy.context.object.name = 'ChairSeat'\n"
-                "# Table top\n"
-                "bpy.ops.mesh.primitive_cube_add(size=2, location=(3, 0, 1))\n"
-                "bpy.context.object.name = 'TableTop'\n"
-                "```\n\n"
-                "IMPORTANT: Use bpy.context.object (not active_object) to get the last created object.\n\n"
             )
             base_context += steps
         
-        enhanced = base_context + f"NOW CREATE: {prompt}\n\n"
-        enhanced += "Respond with ONLY the Python code in ```python code blocks. No explanations."
+        enhanced = base_context + f"CREATE: {prompt}\n"
         
         return enhanced
     
@@ -211,16 +198,29 @@ def process_llm_response(response: str, library_imports: str = "",
     """
     generator = SceneGenerator()
     
+    print("\n" + "#"*60)
+    print("[DEBUG] Processing LLM Response")
+    print("#"*60)
+    print(f"[DEBUG] Response length: {len(response)} characters")
+    print(f"[DEBUG] First 200 chars: {response[:200]}...")
+    print("#"*60)
+    
     # Extract Python code
     code = generator.extract_python_code(response)
     
     if code:
+        print(f"[DEBUG] ✓ Code extracted successfully ({len(code)} chars)")
+        print(f"[DEBUG] Extracted code:\n{code}")
+        print("#"*60)
         success, message = generator.execute_blender_script(code, library_imports)
         return success, message, code
     else:
+        print("[DEBUG] ✗ No code found in response")
+        print(f"[DEBUG] Full response:\n{response}")
+        print("#"*60)
         if create_fallback:
             # Try to create a simple object based on response
             success, message = generator.create_simple_object_fallback(response)
             return success, message, None
         else:
-            return False, "No executable Python code found in LLM response.", None
+            return False, "No executable Python code found in LLM response. Enable 'Enhance Prompt with Steps' and try again.", None

@@ -66,8 +66,17 @@ class LLM_OT_RunAndExecute(Operator):
         model = props.selected_model
         custom_model = props.custom_model if props.llm_provider == 'ollama' else ""
         
+        # Show progress
+        wm = context.window_manager
+        wm.progress_begin(0, 100)
+        wm.progress_update(10)
+        
         # Call LLM
-        self.report({'INFO'}, f"Calling {props.llm_provider.upper()}...")
+        self.report({'INFO'}, f"⏳ Calling {props.llm_provider.upper()}... Please wait...")
+        print(f"\\n[INFO] Calling {props.llm_provider.upper()} - Model: {model or custom_model}")
+        
+        wm.progress_update(30)
+        
         success, response = llm_integration.get_llm_response(
             provider=props.llm_provider,
             prompt=prompt,
@@ -77,7 +86,10 @@ class LLM_OT_RunAndExecute(Operator):
             custom_model=custom_model
         )
         
+        wm.progress_update(70)
+        
         if not success:
+            wm.progress_end()
             self.report({'ERROR'}, response)
             props.llm_response = response
             return {'CANCELLED'}
@@ -89,11 +101,15 @@ class LLM_OT_RunAndExecute(Operator):
         if props.include_last_response:
             props.last_response = response
         
+        wm.progress_update(80)
+        
         # Process and execute response
         exec_success, message, code = scene_generator.process_llm_response(
             response,
             library_imports=props.library_imports
         )
+        
+        wm.progress_update(90)
         
         if exec_success:
             self.report({'INFO'}, message)
@@ -107,6 +123,9 @@ class LLM_OT_RunAndExecute(Operator):
                     area.tag_redraw()
         else:
             self.report({'WARNING'}, message)
+        
+        wm.progress_update(100)
+        wm.progress_end()
         
         return {'FINISHED'}
 
@@ -242,6 +261,37 @@ class LLM_OT_CopyCode(Operator):
         return {'FINISHED'}
 
 
+class LLM_OT_TestCreate(Operator):
+    """Test operator - creates a simple cube to verify addon works"""
+    bl_idname = "llm.test_create"
+    bl_label = "Test: Create Cube"
+    bl_description = "Test if addon can create objects (creates a simple cube)"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        try:
+            # Simple test code
+            test_code = """import bpy
+bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
+obj = bpy.context.object
+obj.name = 'TestCube'
+print('Test cube created successfully!')
+"""
+            # Execute using the scene generator
+            from . import scene_generator
+            success, message = scene_generator.SceneGenerator.execute_blender_script(test_code)
+            
+            if success:
+                self.report({'INFO'}, "Test successful! Cube created.")
+            else:
+                self.report({'ERROR'}, f"Test failed: {message}")
+            
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"Test error: {str(e)}")
+            return {'CANCELLED'}
+
+
 # List of classes to register
 classes = [
     LLM_OT_RunAndExecute,
@@ -249,6 +299,7 @@ classes = [
     LLM_OT_ExecuteResponse,
     LLM_OT_ClearResponse,
     LLM_OT_CopyCode,
+    LLM_OT_TestCreate,
 ]
 
 
