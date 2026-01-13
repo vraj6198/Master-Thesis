@@ -34,13 +34,14 @@ class LLMPropertyGroup(PropertyGroup):
         name="Ollama Model",
         description="Select Ollama model",
         items=[
+            ('llama3.1:8b', "Llama 3.1 8B", "Llama 3.1 8B model"),
             ('qwen2.5-coder:7b', "Qwen 2.5 Coder 7B", "Qwen 2.5 Coder 7B model"),
             ('codellama:7b', "CodeLlama 7B", "CodeLlama 7B model"),
             ('llama3.2', "Llama 3.2", "Llama 3.2 model"),
             ('mistral', "Mistral", "Mistral model"),
             ('deepseek-coder', "DeepSeek Coder", "DeepSeek Coder model"),
         ],
-        default='qwen2.5-coder:7b'
+        default='llama3.1:8b'
     )
     
     # Model selection - OpenAI
