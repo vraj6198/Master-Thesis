@@ -12,28 +12,29 @@ bl_info = {
     "category": "3D View",
 }
 
-import bpy
-
-from . import properties
-from . import operators
-from . import panels
-from . import scanner_core
-from . import export_utils
-from . import preferences
-
 
 def register():
-    bpy.utils.register_class(preferences.LIDAR_AddonPreferences)
+    from . import properties
+    from . import preferences
+    from . import operators
+    from . import panels
+    
+    preferences.register()
     properties.register()
     operators.register()
     panels.register()
 
 
 def unregister():
+    from . import properties
+    from . import preferences
+    from . import operators
+    from . import panels
+    
     panels.unregister()
     operators.unregister()
     properties.unregister()
-    bpy.utils.unregister_class(preferences.LIDAR_AddonPreferences)
+    preferences.unregister()
 
 
 if __name__ == "__main__":

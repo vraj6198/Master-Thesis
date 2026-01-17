@@ -15,14 +15,12 @@ class LIDAR_PT_main_panel(Panel):
         layout = self.layout
         settings = context.scene.lidar_scanner
         
-        # Main scan button
         row = layout.row(align=True)
         row.scale_y = 2.0
         row.operator("lidar.scan", text="Run LiDAR Scan", icon='OUTLINER_OB_POINTCLOUD')
         
         layout.separator()
         
-        # Scanner object selection
         box = layout.box()
         box.label(text="Scanner Object", icon='EMPTY_ARROWS')
         box.prop(settings, "scanner_object", text="")
@@ -37,17 +35,18 @@ class LIDAR_PT_prompt_panel(Panel):
     bl_region_type = 'UI'
     bl_category = 'LiDAR'
     bl_parent_id = "LIDAR_PT_main_panel"
-    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout
         settings = context.scene.lidar_scanner
 
-        layout.prop(settings, "prompt_text", text="Prompt")
+        layout.label(text="Describe scan parameters:")
+        layout.prop(settings, "prompt_text", text="")
         layout.operator("lidar.apply_prompt", text="Apply Prompt", icon='CHECKMARK')
 
         if settings.last_llm_status:
-            layout.label(text=settings.last_llm_status)
+            box = layout.box()
+            box.label(text=settings.last_llm_status, icon='INFO')
 
 
 class LIDAR_PT_presets_panel(Panel):
@@ -81,7 +80,6 @@ class LIDAR_PT_scanner_panel(Panel):
         layout = self.layout
         settings = context.scene.lidar_scanner
         
-        # Origin and Rotation
         col = layout.column(align=True)
         col.label(text="Position & Orientation:")
         col.prop(settings, "origin", text="Origin")
@@ -89,14 +87,12 @@ class LIDAR_PT_scanner_panel(Panel):
         
         layout.separator()
         
-        # Field of View
         col = layout.column(align=True)
         col.label(text="Field of View (degrees):")
         row = col.row(align=True)
         row.prop(settings, "fov_h", text="Horizontal")
         row.prop(settings, "fov_v", text="Vertical")
         
-        # Resolution
         col = layout.column(align=True)
         col.label(text="Resolution (degrees):")
         row = col.row(align=True)
@@ -105,14 +101,12 @@ class LIDAR_PT_scanner_panel(Panel):
         
         layout.separator()
         
-        # Range
         col = layout.column(align=True)
         col.label(text="Range (meters):")
         row = col.row(align=True)
         row.prop(settings, "range_min", text="Min")
         row.prop(settings, "range_max", text="Max")
         
-        # Point estimation
         layout.operator("lidar.estimate_points", text="Estimate Points", icon='STICKY_UVS_DISABLE')
 
 
@@ -269,7 +263,6 @@ class LIDAR_PT_export_panel(Panel):
         layout = self.layout
         settings = context.scene.lidar_scanner
         
-        # Export formats
         col = layout.column(align=True)
         col.label(text="Export Formats:")
         row = col.row(align=True)
@@ -281,14 +274,12 @@ class LIDAR_PT_export_panel(Panel):
         
         layout.separator()
         
-        # Export path and filename
         col = layout.column(align=True)
         col.prop(settings, "export_path", text="Path")
         col.prop(settings, "export_filename", text="Filename")
         
         layout.separator()
         
-        # Export options
         col = layout.column(align=True)
         col.label(text="Include:")
         col.prop(settings, "include_labels")
@@ -366,7 +357,6 @@ class LIDAR_PT_debug_panel(Panel):
         col.prop(settings, "debug_rays")
 
 
-# Registration
 classes = [
     LIDAR_PT_main_panel,
     LIDAR_PT_prompt_panel,

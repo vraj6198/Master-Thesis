@@ -12,6 +12,74 @@ from bpy.props import (
 from bpy.types import PropertyGroup
 
 
+def apply_preset(self, context):
+    """Apply preset sensor configurations"""
+    preset = self.sensor_preset
+    
+    presets = {
+        'VELODYNE_VLP16': {
+            'fov_h': 360.0,
+            'fov_v': 30.0,
+            'resolution_h': 0.2,
+            'resolution_v': 2.0,
+            'range_max': 100.0,
+        },
+        'VELODYNE_HDL32': {
+            'fov_h': 360.0,
+            'fov_v': 41.33,
+            'resolution_h': 0.16,
+            'resolution_v': 1.33,
+            'range_max': 100.0,
+        },
+        'VELODYNE_HDL64': {
+            'fov_h': 360.0,
+            'fov_v': 26.8,
+            'resolution_h': 0.08,
+            'resolution_v': 0.4,
+            'range_max': 120.0,
+        },
+        'OUSTER_OS1_32': {
+            'fov_h': 360.0,
+            'fov_v': 45.0,
+            'resolution_h': 0.35,
+            'resolution_v': 1.4,
+            'range_max': 120.0,
+        },
+        'OUSTER_OS1_64': {
+            'fov_h': 360.0,
+            'fov_v': 45.0,
+            'resolution_h': 0.35,
+            'resolution_v': 0.7,
+            'range_max': 120.0,
+        },
+        'LIVOX_MID40': {
+            'fov_h': 38.4,
+            'fov_v': 38.4,
+            'resolution_h': 0.05,
+            'resolution_v': 0.05,
+            'range_max': 260.0,
+        },
+        'GENERIC_32': {
+            'fov_h': 360.0,
+            'fov_v': 40.0,
+            'resolution_h': 0.2,
+            'resolution_v': 1.25,
+            'range_max': 100.0,
+        },
+        'GENERIC_64': {
+            'fov_h': 360.0,
+            'fov_v': 26.8,
+            'resolution_h': 0.1,
+            'resolution_v': 0.42,
+            'range_max': 120.0,
+        },
+    }
+    
+    if preset in presets:
+        for key, value in presets[preset].items():
+            setattr(self, key, value)
+
+
 class LiDARScannerSettings(PropertyGroup):
     """Main settings for the LiDAR scanner"""
     
@@ -31,7 +99,7 @@ class LiDARScannerSettings(PropertyGroup):
             ('GENERIC_64', 'Generic 64-Channel', 'Generic 64-channel LiDAR'),
         ],
         default='AUTO',
-        update=lambda self, ctx: apply_preset(self, ctx)
+        update=apply_preset
     )
     
     # Scanner Object
@@ -65,7 +133,6 @@ class LiDARScannerSettings(PropertyGroup):
         default=360.0,
         min=1.0,
         max=360.0,
-        subtype='ANGLE',
     )
     
     fov_v: FloatProperty(
@@ -74,7 +141,6 @@ class LiDARScannerSettings(PropertyGroup):
         default=30.0,
         min=1.0,
         max=90.0,
-        subtype='ANGLE',
     )
     
     # Resolution
@@ -366,7 +432,6 @@ class LiDARScannerSettings(PropertyGroup):
         name="Prompt",
         description="Describe the scene and scan parameters in natural language",
         default="",
-        options={'MULTILINE'},
     )
 
     last_llm_status: StringProperty(
@@ -374,74 +439,6 @@ class LiDARScannerSettings(PropertyGroup):
         description="Last LLM prompt parsing status",
         default="",
     )
-
-
-def apply_preset(settings, context):
-    """Apply preset sensor configurations"""
-    preset = settings.sensor_preset
-    
-    presets = {
-        'VELODYNE_VLP16': {
-            'fov_h': 360.0,
-            'fov_v': 30.0,
-            'resolution_h': 0.2,
-            'resolution_v': 2.0,
-            'range_max': 100.0,
-        },
-        'VELODYNE_HDL32': {
-            'fov_h': 360.0,
-            'fov_v': 41.33,
-            'resolution_h': 0.16,
-            'resolution_v': 1.33,
-            'range_max': 100.0,
-        },
-        'VELODYNE_HDL64': {
-            'fov_h': 360.0,
-            'fov_v': 26.8,
-            'resolution_h': 0.08,
-            'resolution_v': 0.4,
-            'range_max': 120.0,
-        },
-        'OUSTER_OS1_32': {
-            'fov_h': 360.0,
-            'fov_v': 45.0,
-            'resolution_h': 0.35,
-            'resolution_v': 1.4,
-            'range_max': 120.0,
-        },
-        'OUSTER_OS1_64': {
-            'fov_h': 360.0,
-            'fov_v': 45.0,
-            'resolution_h': 0.35,
-            'resolution_v': 0.7,
-            'range_max': 120.0,
-        },
-        'LIVOX_MID40': {
-            'fov_h': 38.4,
-            'fov_v': 38.4,
-            'resolution_h': 0.05,
-            'resolution_v': 0.05,
-            'range_max': 260.0,
-        },
-        'GENERIC_32': {
-            'fov_h': 360.0,
-            'fov_v': 40.0,
-            'resolution_h': 0.2,
-            'resolution_v': 1.25,
-            'range_max': 100.0,
-        },
-        'GENERIC_64': {
-            'fov_h': 360.0,
-            'fov_v': 26.8,
-            'resolution_h': 0.1,
-            'resolution_v': 0.42,
-            'range_max': 120.0,
-        },
-    }
-    
-    if preset in presets:
-        for key, value in presets[preset].items():
-            setattr(settings, key, value)
 
 
 class LiDARSceneSettings(PropertyGroup):

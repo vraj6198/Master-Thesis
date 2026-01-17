@@ -4,7 +4,6 @@ import bmesh
 import math
 import random
 from mathutils import Vector, Matrix, Euler
-from typing import List, Tuple, Optional, Dict, Any
 import time
 
 
@@ -13,10 +12,9 @@ class ScanPoint:
     __slots__ = ['position', 'distance', 'intensity', 'normal', 'object_name', 
                  'category_id', 'return_number', 'angle_h', 'angle_v']
     
-    def __init__(self, position: Vector, distance: float, intensity: float = 1.0,
-                 normal: Optional[Vector] = None, object_name: str = "",
-                 category_id: str = "", return_number: int = 1,
-                 angle_h: float = 0.0, angle_v: float = 0.0):
+    def __init__(self, position, distance, intensity=1.0, normal=None, 
+                 object_name="", category_id="", return_number=1,
+                 angle_h=0.0, angle_v=0.0):
         self.position = position
         self.distance = distance
         self.intensity = intensity
@@ -33,20 +31,19 @@ class LiDARScanner:
     
     def __init__(self, settings):
         self.settings = settings
-        self.points: List[ScanPoint] = []
+        self.points = []
         self.scan_time = 0.0
         
-    def get_scanner_matrix(self) -> Matrix:
+    def get_scanner_matrix(self):
         """Get the transformation matrix for the scanner"""
         if self.settings.scanner_object:
             return self.settings.scanner_object.matrix_world.copy()
         else:
-            # Use manual origin and rotation
             loc = Vector(self.settings.origin)
             rot = Euler([math.radians(r) for r in self.settings.rotation_deg], 'XYZ')
             return Matrix.Translation(loc) @ rot.to_matrix().to_4x4()
     
-    def generate_ray_directions(self) -> List[Tuple[float, float, Vector]]:
+    def generate_ray_directions(self):
         """Generate ray directions based on FOV and resolution settings"""
         directions = []
         
@@ -55,11 +52,9 @@ class LiDARScanner:
         res_h = max(0.01, self.settings.resolution_h)
         res_v = max(0.01, self.settings.resolution_v)
         
-        # Calculate number of steps
         h_steps = int(fov_h / res_h)
         v_steps = int(fov_v / res_v)
         
-        # Starting angles (centered)
         h_start = -fov_h / 2
         v_start = -fov_v / 2
         
@@ -68,7 +63,6 @@ class LiDARScanner:
                 angle_h = h_start + h_idx * res_h
                 angle_v = v_start + v_idx * res_v
                 
-                # Convert spherical to cartesian (Y-forward in Blender)
                 h_rad = math.radians(angle_h)
                 v_rad = math.radians(angle_v)
                 
@@ -81,7 +75,7 @@ class LiDARScanner:
         
         return directions
     
-    def apply_noise_to_distance(self, distance: float) -> float:
+    def apply_noise_to_distance(self, distance):
         """Apply noise to distance measurement"""
         if not self.settings.enable_noise:
             return distance
@@ -93,21 +87,20 @@ class LiDARScanner:
         elif self.settings.noise_type == 'UNIFORM':
             noise = random.uniform(-sigma * 2, sigma * 2)
         elif self.settings.noise_type == 'RAYLEIGH':
-            noise = random.gauss(0, sigma) ** 2 + random.gauss(0, sigma) ** 2
-            noise = math.sqrt(noise) * (1 if random.random() > 0.5 else -1)
+            noise = math.sqrt(random.gauss(0, sigma) ** 2 + random.gauss(0, sigma) ** 2)
+            noise = noise * (1 if random.random() > 0.5 else -1)
         else:
             noise = 0
         
         return max(0, distance + noise)
     
-    def apply_noise_to_direction(self, direction: Vector) -> Vector:
+    def apply_noise_to_direction(self, direction):
         """Apply angular noise to ray direction"""
         if not self.settings.enable_noise or self.settings.angular_noise_deg <= 0:
             return direction
         
         sigma = math.radians(self.settings.angular_noise_deg)
         
-        # Apply random rotation
         noise_x = random.gauss(0, sigma)
         noise_y = random.gauss(0, sigma)
         noise_z = random.gauss(0, sigma)
@@ -117,39 +110,33 @@ class LiDARScanner:
         
         return noisy_dir.normalized()
     
-    def should_dropout(self) -> bool:
+    def should_dropout(self):
         """Determine if a point should be dropped"""
         if not self.settings.enable_noise:
             return False
         return random.random() < self.settings.dropout_prob
     
-    def calculate_intensity(self, distance: float, hit_obj: bpy.types.Object,
-                           normal: Vector, ray_dir: Vector) -> float:
+    def calculate_intensity(self, distance, hit_obj, normal, ray_dir):
         """Calculate return intensity based on distance, material, and angle"""
         if not self.settings.enable_intensity:
             return 1.0
         
-        # Base intensity from material (if available)
         base_intensity = 1.0
         if hit_obj and hit_obj.active_material:
             mat = hit_obj.active_material
             if mat.use_nodes and mat.node_tree:
-                # Try to get base color from Principled BSDF
                 for node in mat.node_tree.nodes:
                     if node.type == 'BSDF_PRINCIPLED':
                         color = node.inputs['Base Color'].default_value
-                        # Luminance calculation
                         base_intensity = 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]
                         break
         
-        # Angle of incidence factor (Lambert's law)
         if normal:
             cos_angle = abs(normal.dot(-ray_dir))
             angle_factor = max(0.1, cos_angle)
         else:
             angle_factor = 1.0
         
-        # Distance falloff
         if self.settings.intensity_falloff == 'QUADRATIC':
             distance_factor = 1.0 / max(1.0, distance ** 2) * 100
         elif self.settings.intensity_falloff == 'LINEAR':
@@ -160,54 +147,44 @@ class LiDARScanner:
         intensity = base_intensity * angle_factor * distance_factor
         return min(1.0, max(0.0, intensity))
     
-    def apply_weather_effects(self, distance: float, intensity: float) -> Tuple[float, float, bool]:
+    def apply_weather_effects(self, distance, intensity):
         """Apply weather effects (rain, fog) to measurements"""
         if not self.settings.enable_weather:
             return distance, intensity, True
         
-        # Rain attenuation
         if self.settings.rain_rate > 0:
-            # Simplified rain model based on rainfall rate
             rain_atten = math.exp(-0.01 * self.settings.rain_rate * distance)
             intensity *= rain_atten
             
-            # Random early returns from rain drops
             if random.random() < self.settings.rain_rate / 1000 * distance / 10:
                 distance = distance * random.uniform(0.3, 0.9)
         
-        # Fog effects
         if self.settings.fog_density > 0:
             fog_atten = math.exp(-self.settings.fog_density * distance / 50)
             intensity *= fog_atten
             
-            # Fog can cause false returns
             if intensity < 0.05:
                 return distance, intensity, False
         
         return distance, intensity, True
     
-    def get_category_id(self, obj: bpy.types.Object) -> str:
+    def get_category_id(self, obj):
         """Get category ID from object custom properties"""
         if obj is None:
             return ""
         
-        # Check for custom property
         if "categoryID" in obj:
             return str(obj["categoryID"])
         if "category_id" in obj:
             return str(obj["category_id"])
         
-        # Fall back to object name
         return obj.name
     
-    def cast_ray(self, origin: Vector, direction: Vector, 
-                 angle_h: float, angle_v: float) -> Optional[ScanPoint]:
+    def cast_ray(self, origin, direction, angle_h, angle_v):
         """Cast a single ray and return scan point if hit"""
         
-        # Apply angular noise
         noisy_dir = self.apply_noise_to_direction(direction)
         
-        # Ray cast
         depsgraph = bpy.context.evaluated_depsgraph_get()
         result, location, normal, index, obj, matrix = bpy.context.scene.ray_cast(
             depsgraph, origin, noisy_dir
@@ -216,32 +193,23 @@ class LiDARScanner:
         if not result:
             return None
         
-        # Calculate distance
         distance = (location - origin).length
         
-        # Check range limits
         if distance < self.settings.range_min or distance > self.settings.range_max:
             return None
         
-        # Apply dropout
         if self.should_dropout():
             return None
         
-        # Apply noise to distance
         noisy_distance = self.apply_noise_to_distance(distance)
-        
-        # Calculate noisy position
         noisy_position = origin + noisy_dir * noisy_distance
         
-        # Calculate intensity
         intensity = self.calculate_intensity(distance, obj, normal, noisy_dir)
         
-        # Apply weather effects
         noisy_distance, intensity, valid = self.apply_weather_effects(noisy_distance, intensity)
         if not valid:
             return None
         
-        # Get category
         category = self.get_category_id(obj)
         
         return ScanPoint(
@@ -256,16 +224,14 @@ class LiDARScanner:
             angle_v=angle_v
         )
     
-    def scan(self, progress_callback=None) -> List[ScanPoint]:
+    def scan(self, progress_callback=None):
         """Perform the full LiDAR scan"""
         start_time = time.time()
         self.points = []
         
-        # Get scanner transformation
         scanner_matrix = self.get_scanner_matrix()
         origin = scanner_matrix.translation.copy()
         
-        # Generate ray directions
         directions = self.generate_ray_directions()
         total_rays = len(directions)
         
@@ -273,16 +239,13 @@ class LiDARScanner:
             print(f"LiDAR Scan: {total_rays} rays to cast")
         
         for i, (angle_h, angle_v, local_dir) in enumerate(directions):
-            # Transform direction to world space
             world_dir = (scanner_matrix.to_3x3() @ local_dir).normalized()
             
-            # Cast ray
             point = self.cast_ray(origin, world_dir, angle_h, angle_v)
             
             if point:
                 self.points.append(point)
             
-            # Progress callback
             if progress_callback and i % 1000 == 0:
                 progress_callback(i / total_rays)
         
@@ -293,33 +256,29 @@ class LiDARScanner:
         
         return self.points
     
-    def get_points_as_array(self) -> List[List[float]]:
+    def get_points_as_array(self):
         """Get points as a list of [x, y, z, intensity, distance] lists"""
         return [
             [p.position.x, p.position.y, p.position.z, p.intensity, p.distance]
             for p in self.points
         ]
     
-    def create_point_cloud_mesh(self, name: str = "LiDAR_PointCloud") -> bpy.types.Object:
+    def create_point_cloud_mesh(self, name="LiDAR_PointCloud"):
         """Create a mesh object from the scan points"""
         mesh = bpy.data.meshes.new(name)
         obj = bpy.data.objects.new(name, mesh)
         
         bm = bmesh.new()
         
-        # Add vertices for each point
         for point in self.points:
             bm.verts.new(point.position)
         
         bm.to_mesh(mesh)
         bm.free()
         
-        # Add to scene
         bpy.context.collection.objects.link(obj)
         
-        # Add custom attributes for intensity, etc.
         if self.points:
-            # Create intensity attribute
             if not mesh.attributes.get("intensity"):
                 mesh.attributes.new(name="intensity", type='FLOAT', domain='POINT')
             
@@ -327,7 +286,6 @@ class LiDARScanner:
             for i, point in enumerate(self.points):
                 intensity_attr.data[i].value = point.intensity
             
-            # Create distance attribute
             if not mesh.attributes.get("distance"):
                 mesh.attributes.new(name="distance", type='FLOAT', domain='POINT')
             
@@ -337,10 +295,10 @@ class LiDARScanner:
         
         return obj
     
-    def get_scan_statistics(self) -> Dict[str, Any]:
+    def get_scan_statistics(self):
         """Get statistics about the scan"""
         if not self.points:
-            return {}
+            return {'total_points': 0, 'scan_time': self.scan_time}
         
         distances = [p.distance for p in self.points]
         intensities = [p.intensity for p in self.points]
@@ -358,7 +316,7 @@ class LiDARScanner:
         }
 
 
-def clamp_settings(settings) -> dict:
+def clamp_settings(settings):
     """Clamp settings to valid ranges and return a dict"""
     return {
         'fov_h': max(1.0, min(360.0, settings.fov_h)),
@@ -371,10 +329,9 @@ def clamp_settings(settings) -> dict:
     }
 
 
-def generate_scan_json(scene_config: dict, scan_config: dict) -> dict:
+def generate_scan_json(scene_config, scan_config):
     """Generate JSON configuration for LiDAR scan"""
     
-    # Clamp values
     fov_h = max(1, min(360, scan_config.get('fov_h', 360)))
     fov_v = max(1, min(90, scan_config.get('fov_v', 30)))
     res_h = max(0.01, min(5, scan_config.get('resolution_h', 0.2)))

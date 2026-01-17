@@ -43,9 +43,17 @@ class LIDAR_AddonPreferences(bpy.types.AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="LLM Prompt Parsing")
+        layout.label(text="LLM Prompt Parsing Settings")
         layout.prop(self, "llm_endpoint")
         layout.prop(self, "llm_model")
         layout.prop(self, "llm_api_key")
         layout.prop(self, "llm_temperature")
         layout.prop(self, "llm_timeout_s")
+
+
+def register():
+    bpy.utils.register_class(LIDAR_AddonPreferences)
+
+
+def unregister():
+    bpy.utils.unregister_class(LIDAR_AddonPreferences)

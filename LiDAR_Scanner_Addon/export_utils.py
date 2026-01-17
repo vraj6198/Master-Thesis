@@ -3,21 +3,17 @@ import bpy
 import os
 import csv
 import struct
-from typing import List, Optional
-from .scanner_core import ScanPoint
 
 
-def ensure_directory(path: str) -> str:
+def ensure_directory(path):
     """Ensure the export directory exists"""
-    # Convert Blender relative path
     if path.startswith("//"):
         path = bpy.path.abspath(path)
-    
     os.makedirs(path, exist_ok=True)
     return path
 
 
-def get_export_filepath(settings, extension: str, frame: Optional[int] = None) -> str:
+def get_export_filepath(settings, extension, frame=None):
     """Generate the full export file path"""
     base_path = ensure_directory(settings.export_path)
     filename = settings.export_filename
@@ -28,14 +24,10 @@ def get_export_filepath(settings, extension: str, frame: Optional[int] = None) -
     return os.path.join(base_path, f"{filename}.{extension}")
 
 
-def export_ply(points: List[ScanPoint], filepath: str, 
-               include_normals: bool = True, 
-               include_intensity: bool = True,
-               include_labels: bool = True) -> bool:
+def export_ply(points, filepath, include_normals=True, include_intensity=True, include_labels=True):
     """Export point cloud to PLY format"""
     try:
         with open(filepath, 'w') as f:
-            # Write header
             f.write("ply\n")
             f.write("format ascii 1.0\n")
             f.write(f"element vertex {len(points)}\n")
@@ -59,7 +51,6 @@ def export_ply(points: List[ScanPoint], filepath: str,
             
             f.write("end_header\n")
             
-            # Write vertex data
             for point in points:
                 line = f"{point.position.x:.6f} {point.position.y:.6f} {point.position.z:.6f}"
                 
@@ -70,7 +61,6 @@ def export_ply(points: List[ScanPoint], filepath: str,
                     line += f" {point.intensity:.6f} {point.distance:.6f}"
                 
                 if include_labels:
-                    # Convert intensity to grayscale color
                     gray = int(point.intensity * 255)
                     line += f" {gray} {gray} {gray}"
                 
@@ -82,57 +72,10 @@ def export_ply(points: List[ScanPoint], filepath: str,
         return False
 
 
-def export_ply_binary(points: List[ScanPoint], filepath: str,
-                      include_normals: bool = True,
-                      include_intensity: bool = True) -> bool:
-    """Export point cloud to binary PLY format (more compact)"""
-    try:
-        with open(filepath, 'wb') as f:
-            # Write header
-            header = "ply\n"
-            header += "format binary_little_endian 1.0\n"
-            header += f"element vertex {len(points)}\n"
-            header += "property float x\n"
-            header += "property float y\n"
-            header += "property float z\n"
-            
-            if include_normals:
-                header += "property float nx\n"
-                header += "property float ny\n"
-                header += "property float nz\n"
-            
-            if include_intensity:
-                header += "property float intensity\n"
-            
-            header += "end_header\n"
-            f.write(header.encode('ascii'))
-            
-            # Write binary vertex data
-            for point in points:
-                data = struct.pack('<fff', point.position.x, point.position.y, point.position.z)
-                
-                if include_normals:
-                    data += struct.pack('<fff', point.normal.x, point.normal.y, point.normal.z)
-                
-                if include_intensity:
-                    data += struct.pack('<f', point.intensity)
-                
-                f.write(data)
-        
-        return True
-    except Exception as e:
-        print(f"Error exporting binary PLY: {e}")
-        return False
-
-
-def export_csv(points: List[ScanPoint], filepath: str,
-               include_normals: bool = True,
-               include_intensity: bool = True,
-               include_labels: bool = True) -> bool:
+def export_csv(points, filepath, include_normals=True, include_intensity=True, include_labels=True):
     """Export point cloud to CSV format"""
     try:
         with open(filepath, 'w', newline='') as f:
-            # Define columns
             columns = ['x', 'y', 'z']
             
             if include_normals:
@@ -181,12 +124,10 @@ def export_csv(points: List[ScanPoint], filepath: str,
         return False
 
 
-def export_pcd(points: List[ScanPoint], filepath: str,
-               include_intensity: bool = True) -> bool:
+def export_pcd(points, filepath, include_intensity=True):
     """Export point cloud to PCD (Point Cloud Data) format"""
     try:
         with open(filepath, 'w') as f:
-            # Write PCD header
             f.write("# .PCD v0.7 - Point Cloud Data file format\n")
             f.write("VERSION 0.7\n")
             
@@ -207,7 +148,6 @@ def export_pcd(points: List[ScanPoint], filepath: str,
             f.write(f"POINTS {len(points)}\n")
             f.write("DATA ascii\n")
             
-            # Write point data
             for point in points:
                 if include_intensity:
                     f.write(f"{point.position.x:.6f} {point.position.y:.6f} {point.position.z:.6f} {point.intensity:.6f}\n")
@@ -220,24 +160,19 @@ def export_pcd(points: List[ScanPoint], filepath: str,
         return False
 
 
-def export_las(points: List[ScanPoint], filepath: str,
-               include_intensity: bool = True) -> bool:
+def export_las(points, filepath, include_intensity=True):
     """Export point cloud to LAS format (requires laspy)"""
     try:
         import laspy
         
-        # Create LAS file
         header = laspy.LasHeader(point_format=3, version="1.4")
-        
         las = laspy.LasData(header)
         
-        # Set coordinates
         las.x = [p.position.x for p in points]
         las.y = [p.position.y for p in points]
         las.z = [p.position.z for p in points]
         
         if include_intensity:
-            # Scale intensity to 16-bit range
             las.intensity = [int(p.intensity * 65535) for p in points]
         
         las.write(filepath)
@@ -251,23 +186,7 @@ def export_las(points: List[ScanPoint], filepath: str,
         return False
 
 
-def export_xyz(points: List[ScanPoint], filepath: str,
-               include_intensity: bool = True) -> bool:
-    """Export point cloud to simple XYZ format"""
-    try:
-        with open(filepath, 'w') as f:
-            for point in points:
-                if include_intensity:
-                    f.write(f"{point.position.x:.6f} {point.position.y:.6f} {point.position.z:.6f} {point.intensity:.6f}\n")
-                else:
-                    f.write(f"{point.position.x:.6f} {point.position.y:.6f} {point.position.z:.6f}\n")
-        return True
-    except Exception as e:
-        print(f"Error exporting XYZ: {e}")
-        return False
-
-
-def export_all_formats(points: List[ScanPoint], settings, frame: Optional[int] = None) -> dict:
+def export_all_formats(points, settings, frame=None):
     """Export to all enabled formats"""
     results = {}
     
@@ -312,28 +231,3 @@ def export_all_formats(points: List[ScanPoint], settings, frame: Optional[int] =
             print(f"Exported PCD: {filepath}")
     
     return results
-
-
-class PointCloudExporter:
-    """Class to manage point cloud export operations"""
-    
-    def __init__(self, settings):
-        self.settings = settings
-    
-    def export(self, points: List[ScanPoint], frame: Optional[int] = None) -> dict:
-        """Export points to all enabled formats"""
-        return export_all_formats(points, self.settings, frame)
-    
-    def get_export_summary(self, points: List[ScanPoint]) -> str:
-        """Get a summary of what will be exported"""
-        formats = []
-        if self.settings.export_ply:
-            formats.append("PLY")
-        if self.settings.export_csv:
-            formats.append("CSV")
-        if self.settings.export_las:
-            formats.append("LAS")
-        if self.settings.export_pcd:
-            formats.append("PCD")
-        
-        return f"{len(points)} points to {', '.join(formats)} in {self.settings.export_path}"

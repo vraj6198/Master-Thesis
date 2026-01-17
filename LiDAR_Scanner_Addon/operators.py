@@ -7,15 +7,12 @@ import urllib.error
 from bpy.types import Operator
 from bpy.props import StringProperty, BoolProperty
 
-from .scanner_core import LiDARScanner, generate_scan_json
-from .export_utils import PointCloudExporter, export_all_formats
-
 
 def _clamp(value, min_v, max_v):
     return max(min_v, min(max_v, value))
 
 
-def _map_sensor_preset(preset_name: str) -> str:
+def _map_sensor_preset(preset_name):
     if preset_name == "Velodyne":
         return "VELODYNE_VLP16"
     if preset_name == "Generic32":
@@ -23,7 +20,7 @@ def _map_sensor_preset(preset_name: str) -> str:
     return "AUTO"
 
 
-def _apply_llm_config(config: dict, context) -> None:
+def _apply_llm_config(config, context):
     settings = context.scene.lidar_scanner
     scene_settings = context.scene.lidar_scene
 
@@ -95,7 +92,7 @@ def _apply_llm_config(config: dict, context) -> None:
                 settings.include_labels = bool(output.get("include_labels", True))
 
 
-def _call_llm(prompt_text: str, prefs) -> str:
+def _call_llm(prompt_text, prefs):
     system_prompt = (
         "You are a Blender LiDAR scanning assistant inside a Blender add-on. "
         "Return ONLY valid JSON (no markdown, no comments). "
@@ -133,8 +130,14 @@ def _call_llm(prompt_text: str, prefs) -> str:
         result = json.loads(resp.read().decode("utf-8"))
 
     content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    # Strip markdown code blocks if present
     if content.startswith("```"):
-        content = content.strip().strip("`")
+        lines = content.strip().split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        content = "\n".join(lines)
     return content
 
 
@@ -146,15 +149,16 @@ class LIDAR_OT_scan(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
+        from . import scanner_core
+        from . import export_utils
+        
         settings = context.scene.lidar_scanner
         
-        # Create scanner and run scan
-        scanner = LiDARScanner(settings)
+        scanner = scanner_core.LiDARScanner(settings)
         
         self.report({'INFO'}, "Starting LiDAR scan...")
         
         def progress_callback(progress):
-            # Update progress (for future modal operator)
             pass
         
         points = scanner.scan(progress_callback)
@@ -163,20 +167,17 @@ class LIDAR_OT_scan(Operator):
             self.report({'WARNING'}, "No points detected in scan")
             return {'CANCELLED'}
         
-        # Create mesh if enabled
         if settings.add_mesh:
             obj = scanner.create_point_cloud_mesh("LiDAR_Scan")
             context.view_layer.objects.active = obj
             obj.select_set(True)
         
-        # Export if any format is enabled
         if settings.export_ply or settings.export_csv or settings.export_las or settings.export_pcd:
-            results = export_all_formats(points, settings)
+            results = export_utils.export_all_formats(points, settings)
             exported = [fmt for fmt, success in results.items() if success]
             if exported:
                 self.report({'INFO'}, f"Exported: {', '.join(exported)}")
         
-        # Report statistics
         stats = scanner.get_scan_statistics()
         self.report({'INFO'}, 
             f"Scan complete: {stats['total_points']} points in {stats['scan_time']:.2f}s")
@@ -192,13 +193,16 @@ class LIDAR_OT_scan_animation(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
+        from . import scanner_core
+        from . import export_utils
+        
         settings = context.scene.lidar_scanner
         
         if not settings.enable_animation:
             self.report({'ERROR'}, "Animation scanning not enabled")
             return {'CANCELLED'}
         
-        scanner = LiDARScanner(settings)
+        scanner = scanner_core.LiDARScanner(settings)
         all_points = []
         
         frame_start = settings.frame_start
@@ -209,35 +213,25 @@ class LIDAR_OT_scan_animation(Operator):
         
         for frame in range(frame_start, frame_end + 1, frame_step):
             context.scene.frame_set(frame)
-            
             points = scanner.scan()
-            
             if points:
                 all_points.extend(points)
-                
-                # Export single frame if enabled
                 if settings.export_single_frames:
-                    export_all_formats(points, settings, frame)
+                    export_utils.export_all_formats(points, settings, frame)
         
-        # Restore original frame
         context.scene.frame_set(original_frame)
         
-        # Create combined mesh
         if settings.add_mesh and all_points:
-            # Temporarily store all points
             scanner.points = all_points
             obj = scanner.create_point_cloud_mesh("LiDAR_Animation_Scan")
             context.view_layer.objects.active = obj
             obj.select_set(True)
         
-        # Export combined if not single frames
         if not settings.export_single_frames and all_points:
             scanner.points = all_points
-            export_all_formats(all_points, settings)
+            export_utils.export_all_formats(all_points, settings)
         
-        self.report({'INFO'}, 
-            f"Animation scan complete: {len(all_points)} total points")
-        
+        self.report({'INFO'}, f"Animation scan complete: {len(all_points)} total points")
         return {'FINISHED'}
 
 
@@ -251,19 +245,16 @@ class LIDAR_OT_create_scanner_object(Operator):
     def execute(self, context):
         settings = context.scene.lidar_scanner
         
-        # Create empty
         bpy.ops.object.empty_add(type='ARROWS', location=settings.origin)
         scanner_obj = context.active_object
         scanner_obj.name = "LiDAR_Scanner"
         
-        # Apply rotation
         scanner_obj.rotation_euler = [
             math.radians(settings.rotation_deg[0]),
             math.radians(settings.rotation_deg[1]),
             math.radians(settings.rotation_deg[2]),
         ]
         
-        # Set as scanner object
         settings.scanner_object = scanner_obj
         
         self.report({'INFO'}, f"Created scanner object: {scanner_obj.name}")
@@ -310,8 +301,6 @@ class LIDAR_OT_create_scene_object(Operator):
                 math.radians(rot[1]),
                 math.radians(rot[2]),
             ]
-            
-            # Set category ID if provided
             if scene_settings.category_id:
                 obj["categoryID"] = scene_settings.category_id
         
@@ -328,7 +317,6 @@ class LIDAR_OT_load_preset(Operator):
     
     def execute(self, context):
         settings = context.scene.lidar_scanner
-        # Preset is applied automatically via update callback
         self.report({'INFO'}, f"Loaded preset: {settings.sensor_preset}")
         return {'FINISHED'}
 
@@ -348,9 +336,10 @@ class LIDAR_OT_export_json(Operator):
     )
     
     def execute(self, context):
+        from . import scanner_core
+        
         settings = context.scene.lidar_scanner
         
-        # Build configuration dict
         scan_config = {
             'sensor_preset': settings.sensor_preset,
             'origin': list(settings.origin),
@@ -376,9 +365,8 @@ class LIDAR_OT_export_json(Operator):
         if settings.export_pcd:
             scan_config['formats'].append('pcd')
         
-        result = generate_scan_json(None, scan_config)
+        result = scanner_core.generate_scan_json(None, scan_config)
         
-        # Write to file
         filepath = bpy.path.abspath(self.filepath)
         with open(filepath, 'w') as f:
             json.dump(result, f, indent=2)
@@ -414,10 +402,8 @@ class LIDAR_OT_import_json(Operator):
             self.report({'ERROR'}, f"Failed to load JSON: {e}")
             return {'CANCELLED'}
         
-        # Apply scan settings
         if 'scan' in config:
             scan = config['scan']
-            
             if 'sensor_preset' in scan:
                 settings.sensor_preset = scan['sensor_preset']
             if 'origin' in scan:
@@ -461,12 +447,9 @@ class LIDAR_OT_clear_point_clouds(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        # Find and delete all LiDAR point cloud objects
         to_delete = [obj for obj in bpy.data.objects if obj.name.startswith("LiDAR_")]
-        
         for obj in to_delete:
             bpy.data.objects.remove(obj, do_unlink=True)
-        
         self.report({'INFO'}, f"Removed {len(to_delete)} point cloud objects")
         return {'FINISHED'}
 
@@ -480,14 +463,10 @@ class LIDAR_OT_estimate_points(Operator):
     
     def execute(self, context):
         settings = context.scene.lidar_scanner
-        
         h_points = int(settings.fov_h / max(0.01, settings.resolution_h)) + 1
         v_points = int(settings.fov_v / max(0.01, settings.resolution_v)) + 1
         total = h_points * v_points
-        
-        self.report({'INFO'}, 
-            f"Estimated rays: {total:,} ({h_points} H × {v_points} V)")
-        
+        self.report({'INFO'}, f"Estimated rays: {total:,} ({h_points} H × {v_points} V)")
         return {'FINISHED'}
 
 
@@ -513,8 +492,8 @@ class LIDAR_OT_apply_prompt(Operator):
             settings.last_llm_status = f"LLM request failed: {e}"
             self.report({'ERROR'}, settings.last_llm_status)
             return {'CANCELLED'}
-        except json.JSONDecodeError:
-            settings.last_llm_status = "LLM returned invalid JSON"
+        except json.JSONDecodeError as e:
+            settings.last_llm_status = f"LLM returned invalid JSON: {e}"
             self.report({'ERROR'}, settings.last_llm_status)
             return {'CANCELLED'}
         except Exception as e:
@@ -523,12 +502,11 @@ class LIDAR_OT_apply_prompt(Operator):
             return {'CANCELLED'}
 
         _apply_llm_config(config, context)
-        settings.last_llm_status = "Prompt applied"
+        settings.last_llm_status = "Prompt applied successfully"
         self.report({'INFO'}, "Prompt applied")
         return {'FINISHED'}
 
 
-# Registration
 classes = [
     LIDAR_OT_scan,
     LIDAR_OT_scan_animation,
