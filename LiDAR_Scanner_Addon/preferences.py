@@ -4,7 +4,7 @@ from bpy.props import StringProperty, FloatProperty, IntProperty
 
 
 class LIDAR_AddonPreferences(bpy.types.AddonPreferences):
-    bl_idname = __package__
+    bl_idname = "LiDAR_Scanner_Addon"
 
     llm_endpoint: StringProperty(
         name="LLM Endpoint",

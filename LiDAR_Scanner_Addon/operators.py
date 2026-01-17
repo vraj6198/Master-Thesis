@@ -500,7 +500,7 @@ class LIDAR_OT_apply_prompt(Operator):
 
     def execute(self, context):
         settings = context.scene.lidar_scanner
-        prefs = context.preferences.addons[__package__].preferences
+        prefs = context.preferences.addons["LiDAR_Scanner_Addon"].preferences
 
         if not settings.prompt_text.strip():
             self.report({'ERROR'}, "Prompt is empty")
