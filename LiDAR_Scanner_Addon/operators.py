@@ -504,6 +504,23 @@ class LIDAR_OT_apply_prompt(Operator):
         _apply_llm_config(config, context)
         settings.last_llm_status = "Prompt applied successfully"
         self.report({'INFO'}, "Prompt applied")
+
+        if isinstance(config, dict) and "scene" in config:
+            scene_cfg = config.get("scene", {})
+            if scene_cfg.get("create_object"):
+                try:
+                    bpy.ops.lidar.create_scene_object()
+                except Exception as e:
+                    self.report({'WARNING'}, f"Scene object create failed: {e}")
+
+        context.view_layer.update()
+
+        if settings.enable_animation:
+            bpy.ops.lidar.scan_animation()
+        else:
+            bpy.ops.lidar.scan()
+
+        self.report({'INFO'}, "Prompt applied and scan started")
         return {'FINISHED'}
 
 
