@@ -1,0 +1,51 @@
+# Add-on preferences for LLM prompt parsing
+import bpy
+from bpy.props import StringProperty, FloatProperty, IntProperty
+
+
+class LIDAR_AddonPreferences(bpy.types.AddonPreferences):
+    bl_idname = __package__
+
+    llm_endpoint: StringProperty(
+        name="LLM Endpoint",
+        description="OpenAI-compatible chat completions endpoint (e.g. Ollama: http://localhost:11434/v1/chat/completions)",
+        default="http://localhost:11434/v1/chat/completions",
+    )
+
+    llm_model: StringProperty(
+        name="LLM Model",
+        description="Model name to use at the endpoint",
+        default="llama3.1",
+    )
+
+    llm_api_key: StringProperty(
+        name="API Key",
+        description="API key for hosted LLMs (leave empty for local endpoints)",
+        default="",
+        subtype='PASSWORD',
+    )
+
+    llm_temperature: FloatProperty(
+        name="Temperature",
+        description="LLM sampling temperature",
+        default=0.0,
+        min=0.0,
+        max=2.0,
+    )
+
+    llm_timeout_s: IntProperty(
+        name="Timeout (s)",
+        description="Request timeout in seconds",
+        default=30,
+        min=5,
+        max=300,
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="LLM Prompt Parsing")
+        layout.prop(self, "llm_endpoint")
+        layout.prop(self, "llm_model")
+        layout.prop(self, "llm_api_key")
+        layout.prop(self, "llm_temperature")
+        layout.prop(self, "llm_timeout_s")
