@@ -2,6 +2,7 @@
 import bpy
 import math
 import json
+import re
 import urllib.request
 import urllib.error
 from bpy.types import Operator
@@ -139,6 +140,19 @@ def _call_llm(prompt_text, prefs):
             lines = lines[:-1]
         content = "\n".join(lines)
     return content
+
+
+def _extract_json(text):
+    """Try to extract the first JSON object from text."""
+    if not text:
+        return None
+    text = text.strip()
+    if text.startswith("{") and text.endswith("}"):
+        return text
+    match = re.search(r"\{[\s\S]*\}", text)
+    if match:
+        return match.group(0)
+    return None
 
 
 class LIDAR_OT_scan(Operator):
@@ -487,7 +501,10 @@ class LIDAR_OT_apply_prompt(Operator):
 
         try:
             content = _call_llm(settings.prompt_text, prefs)
-            config = json.loads(content)
+            json_text = _extract_json(content)
+            if not json_text:
+                raise json.JSONDecodeError("No JSON object found", content, 0)
+            config = json.loads(json_text)
         except urllib.error.URLError as e:
             settings.last_llm_status = f"LLM request failed: {e}"
             self.report({'ERROR'}, settings.last_llm_status)

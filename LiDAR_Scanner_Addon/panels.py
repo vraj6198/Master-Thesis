@@ -40,6 +40,21 @@ class LIDAR_PT_prompt_panel(Panel):
         layout = self.layout
         settings = context.scene.lidar_scanner
 
+        prefs = None
+        addon = context.preferences.addons.get("LiDAR_Scanner_Addon")
+        if addon:
+            prefs = addon.preferences
+
+        if prefs:
+            box = layout.box()
+            box.label(text="LLM Settings")
+            box.prop(prefs, "llm_endpoint")
+            box.prop(prefs, "llm_model")
+            box.prop(prefs, "llm_api_key")
+            box.prop(prefs, "llm_temperature")
+            box.prop(prefs, "llm_timeout_s")
+            layout.separator()
+
         layout.label(text="Describe scan parameters:")
         layout.prop(settings, "prompt_text", text="")
         layout.operator("lidar.apply_prompt", text="Apply Prompt", icon='CHECKMARK')
