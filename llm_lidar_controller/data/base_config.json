@@ -1,0 +1,26 @@
+{
+  "scanner_object": "Camera",
+  "pose": {
+    "location": [0.0, 0.0, 1.0],
+    "rotation_euler_deg": [0.0, 0.0, 0.0]
+  },
+  "scanner_properties": {
+    "scannerType": "static",
+    "fovX": 60.0,
+    "fovY": 40.0,
+    "resolutionX": 320,
+    "resolutionY": 240,
+    "resolutionPercentage": 100,
+    "distanceLower": 0.0,
+    "distanceUpper": 30.0,
+    "reflectivityLower": 0.1,
+    "reflectivityUpper": 0.9,
+    "exportCSV": true,
+    "exportPLY": false,
+    "exportLAS": false,
+    "exportHDF": false,
+    "exportSingleFrames": false,
+    "dataFilePath": "//scans",
+    "dataFileName": "scan_simple"
+  }
+}
